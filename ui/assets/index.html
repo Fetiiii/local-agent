@@ -1,0 +1,459 @@
+﻿<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <title>Local GPT Chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #0f1014;
+      --sidebar: #0b0c10;
+      --panel: #14151c;
+      --user: #2c2d33;
+      --assistant: #2f3138;
+      --accent: #10a37f;
+      --text: #e8e8ea;
+      --muted: #9ca3af;
+      --shadow: 0 10px 30px rgba(0,0,0,0.35);
+      --radius: 14px;
+    }
+    
+    * { box-sizing: border-box; }
+    
+    /* SAYFA YAPISI */
+    body, html { 
+        margin: 0; 
+        padding: 0;
+        height: 100%; 
+        background: var(--bg); 
+        color: var(--text); 
+        font-family: "Inter", "Segoe UI", system-ui, sans-serif; 
+        overflow: hidden; 
+    }
+
+    .app { 
+        display: grid; 
+        grid-template-columns: 260px 1fr; 
+        height: 100vh; 
+        overflow: hidden; 
+    }
+    
+    /* Sidebar */
+    .sidebar { 
+        background: var(--sidebar); 
+        border-right: 1px solid #111; 
+        display: flex; 
+        flex-direction: column; 
+        padding: 16px; 
+        gap: 12px; 
+        height: 100%;
+    }
+    .brand { font-weight: 700; font-size: 18px; margin-bottom: 6px; }
+    .btn { background: var(--accent); border: none; color: #fff; border-radius: var(--radius); padding: 12px 14px; font-weight: 600; cursor: pointer; transition: 0.2s; box-shadow: var(--shadow); }
+    .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    
+    .history { flex: 1; overflow-y: auto; border: 1px solid #1a1a1a; border-radius: var(--radius); padding: 8px; background: #0d0f14; }
+    
+    
+    .history-item { 
+        padding: 8px 10px; 
+        border-radius: 8px; 
+        color: var(--text); 
+        cursor: pointer; 
+        transition: 0.2s; 
+        margin-bottom: 4px; 
+    }
+    .history-item:hover { background: rgba(255,255,255,0.05); }
+    .history-item.active { background: rgba(16,163,127,0.15); color: var(--accent); border: 1px solid rgba(16,163,127,0.3); }
+    
+    .history-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .history-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
+    
+    /* Butonlar sadece hover olunca görünsün */
+    .history-actions { display: none; gap: 4px; }
+    .history-item:hover .history-actions { display: flex; }
+    
+    .icon-btn { 
+        background: transparent; 
+        border: none; 
+        color: var(--muted); 
+        cursor: pointer; 
+        padding: 2px 4px; 
+        font-size: 14px; 
+        border-radius: 4px;
+        transition: 0.2s;
+    }
+    .icon-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+    .icon-btn.del:hover { color: #ff4d4d; }
+
+    .footer { padding-top: 12px; color: var(--muted); font-size: 12px; text-align: center; border-top: 1px solid #111; }
+    
+    /* Main Area */
+    .main { 
+        display: flex; 
+        flex-direction: column; 
+        height: 100%; 
+        position: relative; 
+        overflow: hidden; 
+    }
+    
+    /* Hero */
+    .hero { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center; pointer-events: none; z-index: 0; }
+    .hero h1 { margin: 0; font-size: 24px; font-weight: 700; }
+    .hero .sub { color: var(--muted); }
+    
+    .mode-pill { pointer-events: auto; padding: 8px 16px; background: var(--panel); border: 1px solid #333; border-radius: 20px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+    .mode-menu { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid #333; padding: 8px; border-radius: 12px; display: none; z-index: 10; width: 200px; }
+    .mode-menu.open { display: block; }
+    .mode-item { padding: 10px; cursor: pointer; border-radius: 6px; }
+    .mode-item:hover { background: #222; }
+    .mode-item.active { color: var(--accent); }
+
+    /* Messages & Scroll */
+    .messages { 
+        flex: 1;                 
+        overflow-y: auto;        
+        min-height: 0;           
+        padding: 20px 40px; 
+        display: flex; 
+        flex-direction: column; 
+        gap: 20px; 
+        margin-top: 60px;        
+        scroll-behavior: smooth;
+    }
+    
+    .messages::-webkit-scrollbar { width: 8px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+    .messages::-webkit-scrollbar-thumb:hover { background: #444; }
+
+    /* Bubbles */
+    .bubble { max-width: 85%; padding: 14px 20px; border-radius: var(--radius); line-height: 1.6; font-size: 15px; position: relative; }
+    .bubble.user { margin-left: auto; background: var(--user); border-bottom-right-radius: 2px; }
+    .bubble.assistant { margin-right: auto; background: var(--assistant); border-bottom-left-radius: 2px; }
+    
+    .bubble.think { 
+        margin-right: auto; 
+        background: #12141a; 
+        color: #777; 
+        font-style: italic; 
+        border: 1px dashed #333; 
+        font-size: 0.9em; 
+        margin-bottom: -10px; 
+        padding: 10px 16px;
+    }
+    .bubble.think::before { content: "💭 Düşünce:"; font-weight: bold; display: block; margin-bottom: 4px; font-style: normal; color: #555; font-size: 0.8em; }
+
+    /* Markdown */
+    .bubble pre { background: #181a21; padding: 12px; border-radius: 8px; overflow-x: auto; border: 1px solid #222; margin: 10px 0; }
+    .bubble code { font-family: monospace; font-size: 0.9em; color: #ddd; }
+    .bubble p { margin: 0 0 10px 0; }
+    .bubble p:last-child { margin: 0; }
+
+    /* Input */
+    .input-bar { padding: 20px 40px; background: var(--bg); border-top: 1px solid #1a1a1a; }
+    .input-box { display: flex; align-items: flex-end; gap: 10px; background: #16181d; border: 1px solid #2a2c35; border-radius: 16px; padding: 12px; transition: 0.2s; }
+    .input-box:focus-within { border-color: var(--accent); }
+    
+    textarea { flex: 1; background: transparent; border: none; color: #fff; resize: none; outline: none; font-size: 15px; max-height: 150px; padding: 4px 0; line-height: 1.5; }
+    
+    .send-btn { width: 36px; height: 36px; background: var(--accent); border: none; border-radius: 10px; color: #fff; cursor: pointer; display: grid; place-items: center; font-size: 16px; transition: 0.2s; }
+    .send-btn:hover { background: #0e8c6b; }
+    
+    .file-btn { color: var(--muted); cursor: pointer; padding: 6px; font-size: 18px; }
+    .file-btn:hover { color: #fff; }
+    .file-name { font-size: 12px; color: var(--accent); max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .tool-card { background: #111; border-left: 3px solid var(--accent); padding: 10px; margin: 5px 0; font-family: monospace; font-size: 12px; color: #aaa; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">🤖 Local GPT</div>
+      <button class="btn" id="new-chat">+ Yeni Sohbet</button>
+      <div class="history" id="history"></div>
+      <div class="footer">v1.3 • Ready</div>
+    </aside>
+    
+    <main class="main">
+      <div class="hero" id="hero">
+        <div class="mode-pill" id="mode-pill">Mod: chat ▼</div>
+        <div class="mode-menu" id="mode-menu"></div>
+        <h1>Hoşgeldin.</h1>
+        <div class="sub">Local LLM hazır. Ne konuşalım?</div>
+      </div>
+      
+      <div class="messages" id="messages"></div>
+      
+      <div class="input-bar">
+        <div class="input-box">
+          <label class="file-btn" title="Dosya ekle">
+            📎 <input type="file" id="file-input" style="display:none" />
+          </label>
+          <span class="file-name" id="file-name"></span>
+          <textarea id="input" rows="1" placeholder="Bir mesaj yaz..."></textarea>
+          <button class="send-btn" id="send-btn">➤</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // --- Ayarlar ---
+    const API_BASE = "http://127.0.0.1:5000/api";
+    const messagesEl = document.getElementById("messages");
+    const inputEl = document.getElementById("input");
+    const sendBtn = document.getElementById("send-btn");
+    const historyEl = document.getElementById("history");
+    const heroEl = document.getElementById("hero");
+    const modePill = document.getElementById("mode-pill");
+    const modeMenu = document.getElementById("mode-menu");
+    const fileInput = document.getElementById("file-input");
+    const fileNameEl = document.getElementById("file-name");
+
+    let currentMode = "chat";
+    let currentConversationId = null;
+    let fileAttachment = null;
+    const modes = ["chat", "coder", "analyst", "agent"];
+
+    // Markdown
+    marked.setOptions({
+      gfm: true,
+      breaks: true,
+      highlight: (code, lang) => {
+        if (lang && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value;
+        return hljs.highlightAuto(code).value;
+      }
+    });
+
+    // --- Mesaj Yazdırma ---
+    function appendMessage(role, text) {
+      if (!text) return;
+      const div = document.createElement("div");
+      div.className = `bubble ${role}`;
+      div.innerHTML = marked.parse(text);
+      messagesEl.appendChild(div);
+      scrollToBottom();
+      heroEl.style.display = "none";
+    }
+
+    function appendThinking(text) {
+      if (!text) return;
+      const div = document.createElement("div");
+      div.className = "bubble think";
+      div.innerText = text;
+      messagesEl.appendChild(div);
+      scrollToBottom();
+      heroEl.style.display = "none";
+    }
+
+    function appendTool(meta) {
+      if (!meta || Object.keys(meta).length === 0) return;
+      const div = document.createElement("div");
+      div.className = "tool-card";
+      let rawOutput = (meta.output !== undefined && meta.output !== null) ? meta.output : "";
+      let out = typeof rawOutput === "string" ? rawOutput : JSON.stringify(rawOutput, null, 2);
+      if (out && out.length > 500) out = out.slice(0, 500) + "... (kısaltıldı)";
+      
+      div.innerText = `Tool: ${meta.name}\nResult: ${out}`;
+      messagesEl.appendChild(div);
+      scrollToBottom();
+    }
+
+    function scrollToBottom() {
+      setTimeout(() => {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }, 50);
+    }
+
+    // --- Mode Menüsü ---
+    const renderModes = () => {
+        modeMenu.innerHTML = "";
+        modes.forEach(m => {
+            const el = document.createElement("div");
+            el.className = "mode-item" + (m === currentMode ? " active" : "");
+            el.innerText = m.toUpperCase();
+            el.onclick = () => { currentMode = m; modePill.innerText = `Mod: ${m} ▼`; modeMenu.classList.remove("open"); };
+            modeMenu.appendChild(el);
+        });
+    };
+    renderModes();
+    
+    modePill.onclick = (e) => { e.stopPropagation(); modeMenu.classList.toggle("open"); };
+    document.onclick = (e) => { if(!modePill.contains(e.target)) modeMenu.classList.remove("open"); };
+
+    // --- API İşlemleri & Geçmiş ---
+    async function loadConversations() {
+        try {
+            const res = await fetch(`${API_BASE}/conversations`);
+            const data = await res.json();
+            historyEl.innerHTML = "";
+            (data.conversations || []).forEach(c => addHistItem(c));
+        } catch(e) { console.error(e); }
+    }
+
+    function addHistItem(c) {
+        const div = document.createElement("div");
+        div.className = "history-item";
+        div.setAttribute("data-id", c.id);
+        
+        // Satır Yapısı
+        const row = document.createElement("div");
+        row.className = "history-row";
+
+        // Başlık
+        const titleEl = document.createElement("span");
+        titleEl.className = "history-title";
+        titleEl.innerText = c.title || "Adsız Sohbet";
+        titleEl.onclick = () => loadMessages(c.id);
+
+        // Aksiyonlar (Butonlar)
+        const actionsEl = document.createElement("span");
+        actionsEl.className = "history-actions";
+
+        // İsim Değiştir Butonu
+        const renBtn = document.createElement("button");
+        renBtn.className = "icon-btn";
+        renBtn.innerHTML = "✎"; 
+        renBtn.title = "Yeniden Adlandır";
+        renBtn.onclick = (e) => { 
+            e.stopPropagation(); 
+            renameConversation(c.id); 
+        };
+
+        // Sil Butonu
+        const delBtn = document.createElement("button");
+        delBtn.className = "icon-btn del";
+        delBtn.innerHTML = "🗑";
+        delBtn.title = "Sil";
+        delBtn.onclick = (e) => { 
+            e.stopPropagation(); 
+            deleteConversation(c.id); 
+        };
+
+        actionsEl.append(renBtn, delBtn);
+        row.append(titleEl, actionsEl);
+        div.append(row);
+
+        historyEl.prepend(div);
+    }
+
+    async function renameConversation(id) {
+        const newTitle = prompt("Yeni sohbet adı:");
+        if (!newTitle) return;
+        try {
+            await fetch(`${API_BASE}/conversations/${id}`, {
+                method: "PUT",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ title: newTitle })
+            });
+            loadConversations(); // Listeyi yenile
+        } catch (e) { console.error(e); }
+    }
+
+    async function deleteConversation(id) {
+        if (!confirm("Bu sohbeti silmek istediğinize emin misiniz?")) return;
+        try {
+            await fetch(`${API_BASE}/conversations/${id}`, { method: "DELETE" });
+            if (String(id) === String(currentConversationId)) {
+                currentConversationId = null;
+                messagesEl.innerHTML = "";
+                heroEl.style.display = "flex";
+            }
+            loadConversations();
+        } catch (e) { console.error(e); }
+    }
+
+    async function loadMessages(id) {
+        currentConversationId = id;
+        Array.from(historyEl.children).forEach(el => {
+            el.classList.toggle("active", String(el.getAttribute("data-id")) === String(id));
+        });
+
+        messagesEl.innerHTML = "";
+        heroEl.style.display = "none";
+
+        try {
+            const res = await fetch(`${API_BASE}/conversations/${id}/messages`);
+            const data = await res.json();
+            if(data.messages) {
+                data.messages.forEach(m => {
+                    if(m.thought) appendThinking(m.thought);
+                    appendMessage(m.role, m.content);
+                });
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    async function sendMessage() {
+        const txt = inputEl.value.trim();
+        if(!txt && !fileAttachment) return;
+
+        if(txt) appendMessage("user", txt);
+        inputEl.value = "";
+        inputEl.style.height = "auto";
+        
+        if(!currentConversationId) {
+            const res = await fetch(`${API_BASE}/conversations`, {method:"POST", body:JSON.stringify({title:"Yeni Sohbet", mode:currentMode})});
+            const d = await res.json();
+            currentConversationId = d.id;
+            addHistItem(d); // Geçici ekle, sonra loadConversations düzeltecek
+            loadMessages(d.id);
+        }
+
+        const payload = { message: txt, mode: currentMode, conversation_id: currentConversationId };
+
+        if(fileAttachment) {
+            const fd = new FormData();
+            fd.append("file", fileAttachment);
+            fd.append("conversation_id", currentConversationId);
+            await fetch(`${API_BASE}/upload/file`, {method:"POST", body:fd});
+            fileAttachment = null;
+            fileNameEl.innerText = "";
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/chat`, {
+                method: "POST", 
+                headers: {"Content-Type":"application/json"},
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+
+            if(data.thought) appendThinking(data.thought);
+            if(data.reply) appendMessage("assistant", data.reply);
+            if(data.tool && Object.keys(data.tool).length) appendTool(data.tool);
+            
+            loadConversations(); 
+        } catch(e) {
+            appendMessage("assistant", "⚠️ Hata: " + e);
+        }
+    }
+
+    // --- Events ---
+    document.getElementById("new-chat").onclick = () => {
+        currentConversationId = null;
+        messagesEl.innerHTML = "";
+        heroEl.style.display = "flex";
+        Array.from(historyEl.children).forEach(el => el.classList.remove("active"));
+    };
+
+    fileInput.onchange = (e) => {
+        fileAttachment = e.target.files[0];
+        fileNameEl.innerText = fileAttachment ? fileAttachment.name : "";
+    };
+
+    sendBtn.onclick = sendMessage;
+    inputEl.onkeydown = (e) => { if(e.key==="Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
+    inputEl.oninput = function() { this.style.height = "auto"; this.style.height = this.scrollHeight + "px"; };
+
+    loadConversations();
+  </script>
+</body>
+</html>

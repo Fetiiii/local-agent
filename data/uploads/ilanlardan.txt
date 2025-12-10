@@ -1,0 +1,206 @@
+Senior Level AI Engineer
+Languages: Python, TypeScript
+Agent/RAG: LangChain/LangGraph, LlamaIndex, AutoGen, CrewAI (or similar)
+Models: OpenAI / Anthropic / Google / Mistral + OSS (Llama, Qwen, etc.)
+Vector & Data: Pinecone, Weaviate, Qdrant, pgvector; Redis; Postgres
+Infra: AWS/GCP/Azure, Docker/K8s, serverless; CI/CD; feature flags
+Eval/Obs: LangSmith, Weights & Biases, custom harnesses
+Safety/Compliance: prompt/response filtering, PII detection, rate-limit & cost controls
+You May Be a Great Fit If You Have
+
+3+ years building backend or ML-powered products (mid–senior or staff).
+Shipped at least one production LLM/agentic system with real users.
+Strong prompt & tool design, function calling, multi-step planning skills.
+Practical RAG experience (indexing strategies, retrieval quality, evals).
+Solid engineering fundamentals (design, testing, observability).
+A product mindset—you care about UX, adoption, and measurable outcomes.
+Bonus Points
+
+Multi-agent graphs/planners/simulators (LangGraph/AutoGen/CrewAI).
+Commerce & CMS integrations (Shopify, Wix, WordPress) or CRM/help desk tools.
+Multimodal (vision, audio) and structured output experience.
+LLM FinOps (quotas, tenant isolation, cost attribution).
+Open-source contributions, talks, papers, or public demos.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Senior Level AI Engineer
+What You’ll Do
+
+Design and develop serverless AI services on AWS (Lambda + API Gateway)
+Integrate and evaluate foundation models via AWS Bedrock (Claude, Llama, Titan) and other providers
+Implement and optimize RAG pipelines (embeddings, retrieval strategies, evaluation)
+Build agentic workflows and tool-using systems (LangGraph / LangChain or custom orchestration)
+Add and improve chatbot features: lead qualification, product Q&A, objection handling, booking, CRM updates
+Design event-driven, observable backends with logging, monitoring, and alerting
+Implement safety & guardrails: rate limiting, PII redaction, content filtering, audit logging
+Run experiments (prompt tests, A/Bs, latency & cost tracking) to continuously improve quality and speed
+Collaborate with Product, Sales, and Operations to translate business needs into robust AI features
+
+
+Minimum Qualifications
+
+Bachelor’s or Master’s degree in Computer Engineering, Electrical & Electronics Engineering, Mathematics, or a related field
+5+ years of professional experience in software development or applied ML
+Strong proficiency in Python
+Hands-on experience with AWS (Lambda, API Gateway, IAM, CloudWatch, and at least one of S3 or DynamoDB)
+Experience calling LLM APIs, using embeddings and vector stores
+Fluency in English
+Based in Istanbul and available for on-site work in Bostancı (with hybrid flexibility)
+Nice to Have
+Production experience with AWS Bedrock
+Experience with LangChain / LangGraph or similar orchestration frameworks
+Experience with vector databases such as Pinecone, FAISS, OpenSearch, or pgvector
+CRM integrations (HubSpot, Salesforce) and webhooks / REST APIs
+Familiarity with security & compliance topics (PII handling, GDPR concepts)
+Experience designing evaluation frameworks for LLM-based systems
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Senior Level AI Engineer
+Ne Bekliyoruz?
+
+Bilgisayar Bilimleri, Yapay Zeka, Makine Öğrenimi veya ilgili bir alanda Yüksek Lisans derecesi.
+Doktora derecesi güçlü bir tercih sebebidir.
+Büyük Dil Modellerinin (LLM'ler) eğitimi ve özellikle ince ayarı (fine-tuning) konusunda kanıtlanmış, derinlemesine endüstri veya araştırma tecrübesi,
+RLHF, DPO ve/veya benzeri gelişmiş LLM hizalama ve ince ayar teknikleri hakkında güçlü teorik bilgi ve pratik uygulama deneyimi,
+Python programlama diline ve PyTorch, TensorFlow, JAX gibi derin öğrenme kütüphanelerine (özellikle PyTorch) ileri düzeyde hakimiyet,
+Hugging Face Transformers, PEFT (Parameter-Efficient Fine-Tuning) gibi LLM ekosistemi araçları ve kütüphaneleri konusunda deneyim,
+Plan&Act, ReAct gibi agentic reasoning patterns üzerine proje deneyimi,
+Güçlü makine öğrenimi temelleri, model değerlendirme metrikleri ve istatistiksel analiz bilgisi,
+Karmaşık teknik problemleri analiz etme, yenilikçi çözümler geliştirme ve bunları uygulama becerisi,
+İyi derecede İngilizce (teknik literatürü takip edebilmek ve potansiyel olarak uluslararası ekiplerle çalışabilmek için),
+Takım çalışmasına yatkınlık ve güçlü iletişim becerileri,
+Tercihen;
+Açık kaynak LLM projelerine (örn. model geliştirme, kütüphane katkısı) katkıda bulunmuş olmak,
+MLOps prensipleri ve araçları (Docker, Kubernetes, MLflow, Weights & Biases vb.) hakkında bilgi sahibi olmak,
+On premise / Bulut platformları üzerinde model eğitimi ve dağıtımı deneyimi,
+Yapay zeka / makine öğrenimi alanında (tercihen LLM üzerine) konferans veya dergi yayını yapmış,
+Güçlü problem çözme, analitik düşünme ve teknik karar alma yeteneği olan,
+İletişim yeteneği güçlü ve ikna kabiliyeti yüksek; farklı paydaşlarla etkili bir şekilde etkileşim kurabilen,
+
+
+Turkcell’de Artifical Intelligence & Machine Learning Engineer Rolü Ne Yapar?
+
+Ürün hedeflerimiz ve veri setlerimiz için en uygun açık kaynaklı LLM'leri araştırır değerlendirir ve seçer,
+Toplanan veriyi kullanarak LLM'ler üzerinde etkili ince ayar (fine-tuning) stratejileri tasarlar ve uygular,
+İnsan Geri Bildiriminden Pekiştirmeli Öğrenme (RLHF), Doğrudan Tercih Optimizasyonu (DPO - Direct Preference Optimization) ve benzeri gelişmiş LLM ince ayar metodolojileri konusunda derinlemesine bilgi sahibidir ve bunları aktif olarak kullanır,
+Gerektiğinde, belirli görevler için LLM'lerin sıfırdan eğitimi süreçlerini yönetir veya bu süreçlere katkıda bulunur,
+Model performansını (doğruluk, hız, maliyet, güvenlik vb.) sürekli olarak izler, değerlendirir ve iyileştirmek çin metrikler ve değerlendirme protokolleri geliştirir,
+Modelleri çıkarım (inference) performansı ve maliyet etkinliği açısından optimize etmek,
+Etkili ve güvenli komut (prompt) tasarımları oluşturur ve komut mühendisliği (prompt engineering) süreçlerine katkıda bulunur,
+MLOps ve Backend ekipleriyle yakın iş birliği içinde çalışarak modellerin ölçeklenebilir ve güvenilir bir şekilde üretim ortamına dağıtımını (deployment) sağlar,
+LLM alanındaki en son akademik araştırmaları, açık kaynak projelerini ve endüstri trendlerini yakından takip eder ve bu bilgileri ekibe ve ürüne entegre eder.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Junior/Mid AI Engineer
+What you will do;
+
+Build and prototype AI agents - Develop internal AI agents and automations for engineering workflows including SDLC processes, documentation generation, and code analysis, etc.
+Work with LLM APIs (OpenAI, Azure OpenAI, etc.) and orchestration frameworks (LangChain, LlamaIndex, CrewAI, AutoGen…) 
+Collaborate on RAG pipelines, vector databases, evaluation workflows, and platform components 
+Integrate agents with internal systems (ServiceNow, Azure DevOps, observability tools, etc.) 
+Research new AI tools, frameworks, and agent patterns — and present findings to the team 
+Develop backend services - Write clean Python code for APIs, workflow logic, and agent orchestration while learning software engineering fundamentals from the team 
+Build quality and reliability practices - Help establish monitoring, logging, testing, and observability standards for production AI systems 
+Document and share knowledge - Contribute to internal documentation, technical playbooks, and best practices that help the team scale 
+
+What we are looking for;
+
+Bachelor's or Master's degree in Computer Science, AI/ML, Data Science, or related field 
+Strong academic foundation in Machine Learning, NLP, or Generative AI through coursework, thesis, or research projects 
+Up-to-date with latest AI/ML research and trends - you actively read papers and follow developments in LLMs, agents, RAG, and emerging techniques 
+Demonstrated ML/GenAI project experience through university research, thesis, internships, hackathons, or personal GitHub repositories 
+Solid software development fundamentals programming skills with ability to write clean, functional code (Python preferred, but Java/Go/.NET acceptable) 
+Familiarity with at least one of these is a plus:
+ • Vector databases (Pinecone, Chroma, Weaviate...)
+ • LangChain / LlamaIndex / AutoGen / CrewAI
+ • Prompt engineering, RAG, embeddings 
+Basic hands-on experience with LLMs - you've experimented with OpenAI, Claude, or similar APIs and understand prompt engineering 
+Ability to read academic papers and translate research concepts into practical code implementations 
+Fast learner with strong problem-solving abilities and eagerness to master production engineering practices 
+Excellent communication skills - can explain complex AI concepts clearly to both technical and non-technical audiences 
+Collaborative mindset - comfortable learning from senior engineers and contributing fresh perspectives from academia 
+ 
+Nice to Have 
+
+Software engineering fundamentals: CI/CD, Git, APIs, Docker, or backend development basics
+Agent framework exposure (LangChain, LlamaIndex, CrewAI) or RAG/vector database experimentation 
+Master's thesis or research publications in LLMs, NLP, Generative AI, or related ML areas 
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Data Engineer
+Veri Mühendisi'nin sorumlulukları nelerdir?
+
+SQL konusunda çok iyi derecede yetkinlik sahibi olmak, özellikle RDBMS, NoSQL ve Büyük Veri Platformları ile çalışmak,
+Çeşitli veri kaynaklarını kullanarak ELT (Extract, Load & Transform) süreçlerini oluşturmak ve bu süreçlerin otomasyonunu sağlamak,
+Sorgu performansını iyileştirmek ve mevcut sorgular için pratik düzeltme yöntemleri sunmak,
+Analitik modellerin gereksinimlerine göre veri mimarisini yönetmek ve veri yapılarını oluşturmak,
+Analitik modellerin kod süreçlerini iyileştirmek, kod performansı ve kalitesini arttırıcı aksiyonlar alabilmek,
+MDLC sürecini sürdürmek ve iyileştirmek,
+Analitik ve veri yönetişimi, altyapı, mimari ve yazılım geliştirme ekipleriyle sürekli iletişim halinde çalışmak,
+Sorumluluğunda olan işleri belirlenen hedef bitiş tarihine göre planlamak,
+Gelecekteki hatalar için etki analizi yapmak, bunların doğru bir şekilde geliştirilmesini sağlamak,
+Projeler kapsamında doğru çıktıları üretmek için proaktif bir yaklaşım sergilemek,
+Analitik süreçler hakkında bilgi sahibi olmak ve analitik ekiplerin oluşturduğu akışları yorumlamak.
+
+Bu rol için aradığımız nitelikler nelerdir?
+
+Bilgisayar Mühendisliği, Elektronik Mühendisliği, Matematik Mühendisliği, Matematik ve ilgili Bilgi Teknolojileri bölümlerden mezun ya da bu alanlarda yüksek lisansı bulunan,
+Analitik modelleme akışları hakkında deneyimi olan ve istatiksel programlama dilleri hakkında bilgi sahibi,
+İlgili alanlarda 0-5 yıl deneyimi olan,
+Büyük Veri Platformları ve Kubernetes, Docker konusunda deneyimli,
+Hadoop bileşenleriyle (HDFS, Hive) çalışma deneyimi olan,
+Akış mimarileri/veri alma yöntemleri hakkında bilgi sahibi olan,
+Python, SQL, Spark ve C++/Java/C# programlama dillerini kullanabilen,
+Gerçek zamana yakın (Near Real Time ) büyük veri işleme süreçleri hakkında deneyime sahip,
+Unix/Linux ve shell scripting konusunda bilgi sahibi olan,
+SQL performans iyileştirme ve optimizasyon deneyimi, ilişkisel veri tabanları ve veri depolama araçları (Oracle, MS SQL) ile çalışma deneyimi olan,
+SQL, TSQL, PLSQL ile geliştirme yapabilme, PL/SQL kodu yazma, SQL'leri anlayıp çözüm üretebilme yeteneğine sahip,
+İlişkisel olmayan veri tabanları ile deneyim sahibi,
+ETL ve Veri Modelleme süreçleri (İlişkisel ve Boyutsal Modelleme) hakkında bilgi sahibi,
+Analitik düşünme ve problem çözme yetkinliğine sahip,
+Veriyi analiz etme ve etkin şekilde yorumlama, veri görselleştirme konularında deneyimi olan,
+Takım çalışmasına yatkın, ikna ve yazılı-sözlü iletişim becerileri gelişmiş,
+İleri seviyede İngilizce bilen.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+AI Engineer (Computer Vision & ML)
+Aranan Nitelikler
+
+Üniversitelerin örgün öğretim yapan, 4 yıllık Bilgisayar Mühendisliği, Elektrik-Elektronik Mühendisliği, Matematik Mühendisliği, Endüstri Mühendisliği gibi bölümlerinden mezun olmak,
+En az 3 yıl Yapay Zeka Mühendisi olarak deneyim sahibi olmak ve güçlü bir proje portföyüne sahip olmak,
+Makine Öğrenmesi (Machine Learning) ve Derin Öğrenme (Deep Learning) temellerine hâkim olmak,
+Görüntü İşleme (Image Processing) ve Bilgisayarla Görü (Computer Vision) konularında pratik deneyime sahip olmak; OCR (Optical Character Recognition) uygulamaları geliştirmiş olmak,
+CNN, Transformer tabanlı modellere, Object Detection, VLM (Vision-Language Models) ile multimodal yapay zeka yaklaşımlarına aşina olmak,
+Model geliştirme süreçlerinin tamamına hâkim olmak (veri hazırlama, eğitim, değerlendirme, yaygınlaştırma) ve analitik model geliştirme yaşam döngüsünü iyi kavramış olmak,
+Mevcut modelleri proje gereksinimlerine uygun şekilde optimize edebilme ve fine-tuning süreçlerini yönetebilme yetkinliği,
+Derin Öğrenme, Bilgisayarlı Görü, LLM ve VLM modelleri ile ilgili konularda Yüksek Lisans ve/veya Doktora derecesi tercih sebebidir.
+Python ve SQL konularında güçlü pratik bilgiye sahip olmak
+Containerized altyapılar (örn. Kubernetes, Docker) hakkında bilgi sahibi olmak,
+Problem çözme becerisine ve detaylara dikkat eden bir çalışma disiplinine sahip olmak,
+Teknik ve teknik olmayan ekiplerle (özellikle iş birimleriyle) etkili iletişim kurabilme yeteneğine sahip olmak,
+Takım çalışmasına yatkın ve iş birliği odaklı bir çalışma tarzına sahip olmak aradığımız yetkinlikler arasındadır.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Senior AI Engineer
+Key responsibilities include:
+
+Design & build multi-agent systems with orchestration logic for complex workflows
+Develop ML models (classification, regression, recommendation, clustering) using libraries such as scikit-learn, XGBoost, LightGBM, and HuggingFace Transformers
+Integrate ML and LLM outputs via RAG pipelines, semantic search, vector search, and agent memory architectures
+Implement feature engineering, data preprocessing, and missing data handling strategies to ensure model robustness
+Build and optimize end-to-end MLOps pipelines on cloud platforms (AWS, Azure, GCP) using MLflow, Kubeflow, Docker, and Kubernetes
+Develop and maintain agentic workflows using CrewAI, LangGraph, LangChain, N8N, and integrate with APIs, databases, and AI-powered tools
+Fine-tune LLMs and ML models using embedding strategies, hyperparameter optimization, and quantization/distillation techniques
+Apply model evaluation metrics (accuracy, precision, recall, F1, ROC-AUC, MSE) to track performance and detect drift
+Implement and monitor guardrails, reflection loops, output verification, and bias/fairness checks for AI/ML outputs
+Collaborate with cross-functional teams to align AI/ML solutions with business goals and operational constraints
+
+How do we describe the perfect match?
+
+Bachelor’s or Master’s degree in Computer Science, Artificial Intelligence, Data Science, or a related field
+5+ years of experience in AI, machine learning, and/or software engineering, with proven delivery of production-grade AI/ML systems
+Strong expertise in agentic AI, LLM systems, RAG pipelines, and ML model development.
+Hands-on experience with CrewAI, N8N, LangChain, LangGraph, LangFlow, LangSmith, OpenAI API and AWS services (Lambda, S3, API Gateway, ECR)
+Proficiency in Python (pandas, NumPy, scikit-learn, SciPy, XGBoost) and SQL for data manipulation, analysis, and feature engineering
+Experience with vector databases (Pinecone, Weaviate, Chroma, Qdrant) and semantic search
+Background in predictive modeling, statistics, and ML evaluation metrics (precision, recall, F1, ROC-AUC, MSE)
+Experience building MLOps pipelines using MLflow, Kubeflow, or SageMaker; deploying to containerized environments (Docker, Kubernetes, OpenShift)
+Familiarity with AI-assisted development tools (Cursor, GitHub Copilot) in daily workflows.
+Ability to communicate AI/ML concepts clearly to both technical and non-technical audiences
+Strong problem-solving skills, analytical thinking, and a data-driven mindset
+Proficient communication skills in English.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

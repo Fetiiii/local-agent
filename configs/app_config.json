@@ -1,0 +1,14 @@
+﻿{
+  "app_name": "Local GPT Agent",
+  "db_path": "data/temp/chat.db",
+  "model_server": {
+    "host": "127.0.0.1",
+    "port": 8080,
+    "base_url": "http://127.0.0.1:8080"
+  },
+  "defaults": {
+    "mode": "chat",
+    "context_size": 4096,
+    "temperature": 0.6
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "default",
+  "context_size": 4096,
+  "temperature": 0.6,
+  "max_tokens": 1024,
+  "n_gpu_layers": 32,
+  "system_prompt": "You are a helpful assistant. Keep replies brief unless more detail is requested."
+}
