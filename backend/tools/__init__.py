@@ -29,10 +29,11 @@ def get_tool(name: str) -> BaseTool:
 
 
 # Auto-import tool modules so they register themselves.
-from backend.tools import file_loader  # noqa: F401,E402
-from backend.tools import web_search  # noqa: F401,E402
-from backend.tools import python_exec  # noqa: F401,E402
-from backend.tools import sql_query  # noqa: F401,E402
-from backend.tools import image_analysis  # noqa: F401,E402
-from backend.tools import shell_exec  # noqa: F401,E402
-from backend.tools import planning  # noqa: F401,E402
+# Only importing active/safe tools for the V2 Architecture.
+
+from backend.tools import file_loader  
+from backend.tools import web_search  
+# from backend.tools import python_exec  # Devre dışı (İsteğe bağlı açılabilir)
+# from backend.tools import sql_query    # Devre dışı
+# from backend.tools import shell_exec   # Kaldırıldı (Güvenlik)
+# from backend.tools import planning     # Kaldırıldı (Agent Reasoning'e taşındı)
