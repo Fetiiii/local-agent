@@ -55,15 +55,31 @@ class RAGManager:
         """
         Sorgu ile en alakalı metin parçalarını getirir.
         """
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=n_results
-        )
-        
-        # ChromaDB sonucu karmaşık bir dict döner, biz sadece textleri alalım
-        # results['documents'] -> [[doc1, doc2, ...]]
-        if results and results['documents']:
-            return results['documents'][0]
+        try:
+            # Koleksiyonun varlığını ve geçerliliğini kontrol et
+            if not hasattr(self, "collection") or self.collection is None:
+                self.collection = self.client.get_or_create_collection(
+                    name="local_knowledge",
+                    embedding_function=self.ef
+                )
+
+            results = self.collection.query(
+                query_texts=[query],
+                n_results=n_results
+            )
+            
+            if results and results['documents']:
+                return results['documents'][0]
+        except Exception as e:
+            print(f"⚠️ RAG Search Hatası: {e}")
+            # Hata durumunda koleksiyonu yenilemeyi dene
+            try:
+                self.collection = self.client.get_or_create_collection(
+                    name="local_knowledge",
+                    embedding_function=self.ef
+                )
+            except:
+                pass
         return []
 
     def _split_text(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:

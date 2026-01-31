@@ -1,9 +1,0 @@
-﻿{
-  "paths": {
-    "uploads": "data/uploads",
-    "temp": "data/temp",
-    "exports": "data/exports",
-    "models": "llama/models",
-    "logs": "llama/logs"
-  }
-}

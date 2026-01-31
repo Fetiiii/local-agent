@@ -1,9 +1,0 @@
-{
-  "name": "coder",
-  "context_size": 8192,
-  "temperature": 0.1,
-  "top_p": 0.8,
-  "max_tokens": 2048,
-  "n_gpu_layers": 40,
-  "system_prompt": "You are a precise software engineer. Reply in the user's language. Provide minimal, correct code with brief context. Avoid speculation and meta-comments."
-}

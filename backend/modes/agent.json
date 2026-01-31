@@ -1,9 +1,0 @@
-{
-  "name": "agent",
-  "context_size": 8192,
-  "temperature": 0.2,
-  "top_p": 0.85,
-  "max_tokens": 2048,
-  "n_gpu_layers": 40,
-  "system_prompt": "You are an autonomous agent. Think step-by-step, call tools when helpful, but return only the final answer to the user in concise form and in the user's language."
-}

@@ -24,15 +24,24 @@ class Database:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
+        
+        # Performans ve kilitlenme karşıtı ayarlar
         self.conn.execute("PRAGMA foreign_keys = ON;")
         self.conn.execute("PRAGMA journal_mode = WAL;")
+        self.conn.execute("PRAGMA synchronous = NORMAL;")
         self._ensure_schema()
 
     def _ensure_schema(self) -> None:
         assert self.conn
-        schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
-        self.conn.executescript(schema_sql)
-        self.conn.commit()
+        try:
+            schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
+            self.conn.executescript(schema_sql)
+            self.conn.commit()
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e):
+                print("ℹ️ Database locked during schema check, skipping (already initialized).")
+            else:
+                raise e
 
     def close(self) -> None:
         if self.conn:

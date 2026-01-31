@@ -1,9 +1,0 @@
-{
-  "name": "chat",
-  "context_size": 4096,
-  "temperature": 0.25,
-  "top_p": 0.85,
-  "max_tokens": 1024,
-  "n_gpu_layers": 32,
-  "system_prompt": "You are a precise, concise assistant. Answer directly to the user request in the same language, avoid meta-analysis, do not include channel tags, and keep responses short unless more detail is asked."
-}
