@@ -9,7 +9,7 @@ import time
 import requests
 from dotenv import load_dotenv
 
-from backend.tools import BaseTool, register_tool
+from backend.tools import BaseTool
 
 load_dotenv()
 
@@ -106,4 +106,4 @@ class WebSearchTool:
             return {"status": "error", "query": q, "message": str(e)}
 
 
-register_tool(WebSearchTool())
+

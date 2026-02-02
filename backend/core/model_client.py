@@ -1,10 +1,11 @@
+import config
 import ollama
 from typing import List, Dict, AsyncGenerator, Any, Optional, Union
 import json
 import asyncio
 
 class ModelClient:
-    def __init__(self, model_name: str = "glm4.7-flash:latest"):
+    def __init__(self, model_name: str = config.MODEL_NAME):
         self.model_name = model_name
         self.client = ollama.AsyncClient()
         print(f"🤖 Model Client Hazır: {self.model_name}")

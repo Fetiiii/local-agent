@@ -1,13 +1,6 @@
-"""
-Tool registry and base class skeletons.
-Each tool module defines a subclass of BaseTool and is registered here.
-"""
+from typing import Any, Dict, Optional, Protocol
 
-from __future__ import annotations
-
-from typing import Any, Dict, Protocol
-
-
+# 1. Standart Arayüz (Her tool buna uymak zorunda)
 class BaseTool(Protocol):
     name: str
     description: str
@@ -15,25 +8,23 @@ class BaseTool(Protocol):
     def run(self, **kwargs: Any) -> Any:
         ...
 
+# 2. Yönetici Sınıf (Registry)
+class ToolRegistry:
+    def __init__(self):
+        self._tools: Dict[str, BaseTool] = {}
 
-TOOL_REGISTRY: Dict[str, BaseTool] = {}
+    def register(self, tool: BaseTool):
+        """Tool'u ismine göre kaydeder."""
+        if not hasattr(tool, 'name'):
+            raise ValueError(f"Tool {tool} must have a 'name' attribute.")
+        
+        # print(f"🔧 Tool Registered: {tool.name}") # İsteğe bağlı log
+        self._tools[tool.name] = tool
 
+    def get(self, name: str) -> Optional[BaseTool]:
+        """İsmi verilen tool'u döndürür."""
+        return self._tools.get(name)
 
-def register_tool(tool: BaseTool) -> None:
-    """Register a tool instance by its name."""
-    TOOL_REGISTRY[tool.name] = tool
-
-
-def get_tool(name: str) -> BaseTool:
-    return TOOL_REGISTRY[name]
-
-
-# Auto-import tool modules so they register themselves.
-# Only importing active/safe tools for the V2 Architecture.
-
-from backend.tools import file_loader  
-from backend.tools import web_search  
-# from backend.tools import python_exec  # Devre dışı (İsteğe bağlı açılabilir)
-# from backend.tools import sql_query    # Devre dışı
-# from backend.tools import shell_exec   # Kaldırıldı (Güvenlik)
-# from backend.tools import planning     # Kaldırıldı (Agent Reasoning'e taşındı)
+    def list_tools(self):
+        """Kayıtlı tool listesini verir."""
+        return list(self._tools.keys())

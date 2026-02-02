@@ -21,7 +21,8 @@ class UniversalIngestor:
             ".docx": self.docx_engine,
             ".doc": self.docx_engine,
             ".xlsx": self.excel_engine,
-            ".xls": self.excel_engine
+            ".xls": self.excel_engine,
+            ".csv": self.excel_engine
         }
 
     def ingest_file(self, file_path: str) -> Optional[str]:
