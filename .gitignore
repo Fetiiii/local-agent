@@ -2,3 +2,4 @@ __pyacache__
 __pypackages__/
 .chainlit/
 data/
+.env/
