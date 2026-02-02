@@ -3,4 +3,3 @@ __pypackages__/
 .chainlit/
 data/
 .env/
-.env/
