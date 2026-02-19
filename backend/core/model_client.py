@@ -3,6 +3,7 @@ import ollama
 from typing import List, Dict, AsyncGenerator, Any, Optional, Union
 import json
 import asyncio
+import chainlit as cl
 
 class ModelClient:
     def __init__(self, model_name: str = config.MODEL_NAME):
@@ -19,10 +20,11 @@ class ModelClient:
             stream: True ise AsyncGenerator döner, False ise string.
             json_mode: True ise çıktı JSON'a zorlanır.
         """
-        
+        settings = cl.user_session.get("settings")
+        temp = settings.get("Temperature", 0.7) if settings else 0.7
         options = {
-            "temperature": 0.7,
-            "num_ctx": 8192, # Context window artırıldı
+            "temperature": temp,
+            "num_ctx": 8192,    
         }
         
         format_param = "json" if json_mode else None
@@ -36,7 +38,7 @@ class ModelClient:
                     messages=messages,
                     options=options,
                     format=format_param,
-                    stream=False
+                    stream=True
                 )
                 return response['message']['content']
                 

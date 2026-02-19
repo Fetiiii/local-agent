@@ -4,7 +4,7 @@ from backend.ingestion.ingestor import UniversalIngestor
 from backend.core.rag import RAGManager
 from backend.database.db import Database
 
-async def handle_uploads(message: cl.Message, conv_id: int) -> str:
+async def handle_uploads(message: cl.Message, thread_id: str) -> str:
     """Paylaşılan çalışan kod mantığına birebir sadık kalınmıştır."""
     ingestor: UniversalIngestor = cl.user_session.get("ingestor")
     rag: RAGManager = cl.user_session.get("rag")
@@ -27,7 +27,7 @@ async def handle_uploads(message: cl.Message, conv_id: int) -> str:
                 if markdown_text:
                     chunks = await cl.make_async(rag.add_document)(markdown_text, source=element.name)
                     count += chunks
-                    try: db.add_file(conv_id, path, ftype="file", summary=f"Imported {element.name}")
+                    try: db.add_file(thread_id, path, ftype="file", summary=f"Imported {element.name}")
                     except: pass
         processing_msg.content = f"✅ {len(message.elements)} dosya okundu. (Analiz için: `{message.elements[0].path}`)"
         await processing_msg.update()

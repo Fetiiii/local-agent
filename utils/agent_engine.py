@@ -7,6 +7,7 @@ import config
 from prompts import SYSTEM_PROMPT
 from utils.helpers import extract_json, safe_db_call
 from utils.tool_manager import run_tool
+from utils.memory_manager import MemoryManager
 from backend.core.model_client import ModelClient
 from backend.database.db import Database
 
@@ -14,20 +15,23 @@ async def run_agent_loop(
     user_query: str, 
     context_str: str, 
     file_hint: str,
-    conv_id: int
+    thread_id: str
 ):
     """
     Agent'ın ana düşünme ve tool kullanma döngüsünü yönetir.
     UI güncellemelerini ve model etkileşimini koordine eder.
     """
     model: ModelClient = cl.user_session.get("model")
-    db: Database = cl.user_session.get("db")
+    # DB artık mesajları kaydetmek için kullanılmıyor, Chainlit hallediyor.
+    # db: Database = cl.user_session.get("db") 
     registry = cl.user_session.get("tool_registry")
-    history: List[Dict[str, str]] = cl.user_session.get("history", [])
+    memory_manager: MemoryManager = cl.user_session.get("memory_manager")
 
     # Mesaj setini hazırla
     current_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    current_messages.extend(history[-5:]) # Son 5 mesajı hafızada tut
+    if memory_manager:
+        formatted_history = await memory_manager.get_formatted_history()
+        current_messages.extend(formatted_history)
     
     user_content = f"User Query: {user_query}{file_hint}\n\nContext from Files (RAG):\n{context_str}"
     print(f"--- DEBUG: USER CONTENT TO MODEL ---\n{user_content}\n-----------------------------------")
@@ -95,17 +99,13 @@ async def run_agent_loop(
         
         # Final Yanıtı
         elif final_answer:
+            # Sadece mesajı gönder, Chainlit arka planda SQLite'a kaydedecek
             await cl.Message(content=final_answer).send()
             
-            # Session geçmişini güncelle
-            history.append({"role": "user", "content": user_query})
-            history.append({"role": "assistant", "content": final_answer})
-            cl.user_session.set("history", history)
+            # Belleği (RAM) güncelle ki bir sonraki mesajda hatırlasın
+            memory_manager = cl.user_session.get("memory_manager")
+            if memory_manager:
+                memory_manager.add_message("assistant", final_answer)
             
-            # DB'ye kaydet
-            await safe_db_call(db.add_message, conv_id, "assistant", final_answer, meta={"thought": thought})
-            break
-        
-        else:
-            await cl.Message(content="⚠️ Model bir karar veremedi.").send()
-            break
+            # DB'ye manuel kayıt ARTIK YOK. Chainlit Data Layer hallediyor.
+            break # Döngüden çık
