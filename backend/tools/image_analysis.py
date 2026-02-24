@@ -15,24 +15,23 @@ class ImageAnalysisTool:
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
 
-    def run(self, image_path: str = None, prompt: str = "Describe this image in detail.", **kwargs: Any) -> str:
+    def run(self, image_path: str = None, prompt: str = "Describe this image in detail.", **kwargs: Any) -> Dict[str, Any]:
         # image_path hem positional hem de kwargs içinden gelebilir, kontrol et
         img_path = image_path or kwargs.get("image_path") or kwargs.get("path")
         
         if not img_path:
-            return "❌ Error: No image path provided. Please specify the 'image_path'."
+            return {"text": "❌ Error: No image path provided.", "artifacts": []}
 
         if not os.path.exists(img_path):
-            return f"❌ Error: Image file not found at {img_path}"
+            return {"text": f"❌ Error: Image file not found at {img_path}", "artifacts": []}
 
         try:
             print(f"👁️ Visual Analysis Başlıyor ({self.model_name})...")
             
             # Resmi encode et
-            base64_image = self._encode_image(image_path)
+            base64_image = self._encode_image(img_path)
             
             # Ollama Vision API çağrısı
-            # keep_alive: 0 -> İşlem bitince modeli VRAM'den hemen temizle
             response = self.client.generate(
                 model=self.model_name,
                 prompt=prompt,
@@ -41,7 +40,11 @@ class ImageAnalysisTool:
             )
             
             result = response.get('response', 'No analysis generated.')
-            return f"--- IMAGE ANALYSIS RESULT ---\n{result}\n-----------------------------"
+            
+            return {
+                "text": f"--- IMAGE ANALYSIS RESULT ---\n{result}",
+                "artifacts": [img_path] # Resmi de yan panele koyalım
+            }
 
         except Exception as e:
-            return f"❌ Error during image analysis: {str(e)}"
+            return {"text": f"❌ Error during image analysis: {str(e)}", "artifacts": []}

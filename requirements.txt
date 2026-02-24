@@ -8,3 +8,4 @@ pandas
 openpyxl
 python-dotenv
 numpy
+plotly

@@ -1,12 +1,13 @@
-# utils/tool_manager.py
 import os
 import chainlit as cl
-from typing import Dict, Any
+from typing import Dict, Any, Union
 from backend.tools import ToolRegistry
+from utils.sidebar_helpers import set_sidebar_elements
 
-def run_tool(name: str, args: Dict[str, Any], registry: ToolRegistry) -> str:
+async def run_tool(name: str, args: Dict[str, Any], registry: ToolRegistry) -> str:
     """
-    Registry'den tool'u çeker ve çalıştırır.
+    Registry'den tool'u çeker ve çalıştırır (Async Wrapper).
+    Eğer tool 'artifacts' dönerse Sidebar'ı günceller.
     """
     # 1. Tool'u Registry'den iste
     tool = registry.get(name)
@@ -15,18 +16,22 @@ def run_tool(name: str, args: Dict[str, Any], registry: ToolRegistry) -> str:
         return f"Error: Tool '{name}' not found in registry."
 
     try:
-        # 2. Özel Durumlar (Argument Mapping)
+        # 2. Argüman Hazırlığı
+        run_kwargs = {}
+        
         if name == "web_search":
-            return str(tool.run(query=args.get("query", "")))
+            run_kwargs = {"query": args.get("query", "")}
         
         elif name == "data_analyst":
-            return tool.run(code=args.get("code", ""))
+            run_kwargs = {"code": args.get("code", "")}
             
         elif name == "file_writer":
-            return tool.run(filename=args.get("filename"), content=args.get("content"))
+            run_kwargs = {
+                "filename": args.get("filename"), 
+                "content": args.get("content")
+            }
 
         elif name == "image_analysis":
-            # Image path mantığı (Helper logic)
             img_path = args.get("image_path") or args.get("path")
             
             # --- UUID Hallucination Fix ---
@@ -37,10 +42,47 @@ def run_tool(name: str, args: Dict[str, Any], registry: ToolRegistry) -> str:
                 else:
                     return f"Error: Image path '{img_path}' not found and no session image available."
             
-            return tool.run(image_path=img_path, prompt=args.get("prompt", "Describe."))
+            run_kwargs = {
+                "image_path": img_path, 
+                "prompt": args.get("prompt", "Describe.")
+            }
+        
+        else:
+            # Standart dışı bir tool geldiyse, direkt argümanları pasla
+            run_kwargs = args
 
-        # Standart dışı bir tool geldiyse, direkt argümanları pasla (Generic Fallback)
-        return tool.run(**args)
+        # 3. Tool'u Thread Pool'da Çalıştır (UI Bloklanmasın)
+        # cl.make_async(func) -> async_func
+        print(f"🔧 Running tool: {name} with args: {run_kwargs}")
+        
+        # Tool execution (Blocking ise thread'e al, async ise bekle)
+        result = await cl.make_async(tool.run)(**run_kwargs)
+
+        # 4. Sonuç İşleme (Sidebar Kontrolü)
+        # Yeni Protokol: { "text": "...", "artifacts": [...] }
+        if isinstance(result, dict) and ("artifacts" in result or "text" in result):
+            text_output = result.get("text", "")
+            artifacts = result.get("artifacts", [])
+            
+            # Eğer artifact varsa sidebar'a bas
+            if artifacts:
+                await set_sidebar_elements(f"Tool: {name}", artifacts)
+                # Yan panele yönlendirme mesajı ekle (opsiyonel)
+                # text_output += "\n(Detaylar yan panelde)"
+            
+            return text_output
+
+        # Legacy Protokol (Sadece string veya düz dict)
+        # Web Search dict döner, onu stringe çevirelim mi?
+        if isinstance(result, dict) and name == "web_search":
+            # Web Search sonucunu da sidebar'a atalım mı? 
+            # Şu anki web_search.py dict dönüyor ama 'artifacts' key'i yok.
+            # Onu da güncelleyip 'artifacts' yapısına uydurabiliriz.
+            return str(result)
+
+        return str(result)
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return f"Tool Execution Error ({name}): {str(e)}"

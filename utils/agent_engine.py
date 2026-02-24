@@ -83,15 +83,11 @@ async def run_agent_loop(
         if tool_name:
             async with cl.Step(name=f"Tool: {tool_name}", type="tool") as tool_step:
                 tool_step.input = str(tool_args)
-                result = await cl.make_async(run_tool)(tool_name, tool_args, registry)
                 
-                if "[IMAGE_GENERATED]:" in result:
-                    text_part, img_path = result.split("[IMAGE_GENERATED]:")
-                    image = cl.Image(path=img_path.strip(), name="analysis_plot", display="inline")
-                    await cl.Message(content="📊 Grafik oluşturuldu:", elements=[image]).send()
-                    tool_step.output = text_part
-                else:
-                    tool_step.output = result
+                # run_tool artık async ve sidebar işlerini kendi hallediyor
+                result = await run_tool(tool_name, tool_args, registry)
+                
+                tool_step.output = result
             
             # Mesaj geçmişine ekle ve döngüye devam et
             current_messages.append({"role": "assistant", "content": json.dumps(decision)})

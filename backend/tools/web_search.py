@@ -62,11 +62,10 @@ class WebSearchTool:
         num_results = max(1, min(num_results, self.MAX_RESULTS))
 
         if not q:
-            return {"status": "error", "message": "Query is empty."}
+            return {"text": "Query is empty.", "artifacts": []}
 
         if not api_key:
-            return {"status": "error", 
-                    "message": "WEB_SEARCH_API_KEY missing. Set your Brave API key in .env."}
+            return {"text": "WEB_SEARCH_API_KEY missing.", "artifacts": []}
 
         # Rate limit (Brave: 1 request per second)
         self._rate_limit()
@@ -93,17 +92,21 @@ class WebSearchTool:
             data = resp.json()
             results = self._extract_results(data)
             limited = results[:num_results]
+            
+            # Text Summary for LLM
+            summary_lines = []
+            for i, r in enumerate(limited, 1):
+                summary_lines.append(f"{i}. {r['title']} - {r['snippet']}")
+            
+            summary_text = f"Found {len(limited)} results for '{q}':\n" + "\n".join(summary_lines)
 
             return {
-                "status": "ok",
-                "query": q,
-                "results": limited,
-                "count": len(limited),
-                "provider": "Brave Search API",
+                "text": summary_text,
+                "artifacts": limited # Helper will render this as Markdown list
             }
 
         except Exception as e:
-            return {"status": "error", "query": q, "message": str(e)}
+            return {"text": f"Search Error: {str(e)}", "artifacts": []}
 
 
 

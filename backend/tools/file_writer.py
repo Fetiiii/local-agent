@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 class FileWriterTool:
     name = "file_writer"
@@ -11,7 +11,7 @@ class FileWriterTool:
     def __init__(self):
         os.makedirs(self.EXPORT_DIR, exist_ok=True)
 
-    def run(self, filename: str, content: str, **kwargs) -> str:
+    def run(self, filename: str, content: str, **kwargs) -> Dict[str, Any]:
         try:
             # Dosya adını temizle (Path Traversal saldırısını önle)
             safe_filename = os.path.basename(filename)
@@ -20,6 +20,12 @@ class FileWriterTool:
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
                 
-            return f"✅ File created successfully at: {file_path}"
+            return {
+                "text": f"✅ File created successfully: {safe_filename}",
+                "artifacts": [file_path]
+            }
         except Exception as e:
-            return f"❌ Error writing file: {str(e)}"
+            return {
+                "text": f"❌ Error writing file: {str(e)}",
+                "artifacts": []
+            }

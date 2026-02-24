@@ -42,7 +42,7 @@ db_url = os.getenv("CHAINLIT_DATABASE_URL")
 def setup_data_layer():
     db_url = os.getenv("CHAINLIT_DATABASE_URL")
     if db_url:
-        print(f"🔌 Connecting to database: {db_url}")
+        print(f"🔌 Connecting to database: {db_url}")        
         return SQLAlchemyDataLayer(conninfo=db_url)
     return None
 
@@ -107,10 +107,11 @@ async def start():
         cl.user_session.set("ingestor", ingestor)
         cl.user_session.set("db", db)
         cl.user_session.set("tool_registry", registry)
+        cl.user_session.set("memory_manager", MemoryManager(max_recent_messages=10))
         cl.user_session.set("history", [])
-        memory = MemoryManager(max_recent_messages=10)
-        cl.user_session.set("memory_manager", memory)
-        cl.user_session.set("history", [])
+        
+        # Sidebar Geçmişi (Append özelliği için)
+        cl.user_session.set("sidebar_history", [])
 
         # RAG Memory Reset
         rag.clear_memory()
