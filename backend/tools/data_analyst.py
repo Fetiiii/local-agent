@@ -7,6 +7,7 @@ from typing import Dict, Any, List
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+import seaborn as sns
 import matplotlib
 matplotlib.use('Agg') # GUI yok, backend
 import matplotlib.pyplot as plt
@@ -25,6 +26,7 @@ class DataAnalystTool:
             "go": go,
             "px": px,
             "plt": plt,
+            "sns": sns,
             "os": os
         }
 
@@ -52,6 +54,9 @@ class DataAnalystTool:
             with contextlib.redirect_stdout(stdout_buffer):
                 # exec içinde local_vars sözlüğünü kullanarak değişkenleri yakalıyoruz
                 exec(code, self.globals, local_vars)
+            
+            # STATE PERSISTENCE: Update globals so variables live across calls
+            self.globals.update(local_vars)
             
             output = stdout_buffer.getvalue()
             

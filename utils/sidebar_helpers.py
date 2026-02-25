@@ -36,7 +36,7 @@ async def set_sidebar_elements(title: str, artifacts: List[Any]):
             elif isinstance(item, pd.DataFrame):
                 name = f"Tablo ({item.shape[0]}x{item.shape[1]})"
                 new_elements.append(
-                    cl.Dataframe(data=item, name=name, display="side")
+                    cl.Dataframe(data=item.head(), name=f"{name}-{base_count + i + 1}", display="side")
                 )
             
             # 3. Dosya Yolu (String)
@@ -46,11 +46,11 @@ async def set_sidebar_elements(title: str, artifacts: List[Any]):
                 
                 if ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp']:
                     new_elements.append(
-                        cl.Image(path=item, name=filename, display="side")
+                        cl.Image(path=item, name=f"{filename}-{base_count + i + 1}", display="side")
                     )
                 else:
                     new_elements.append(
-                        cl.File(path=item, name=filename, display="side")
+                        cl.File(path=item, name=f"{filename}-{base_count + i + 1}", display="side")
                     )
             
             # 4. Web Search Sonuçları (Liste)
@@ -64,13 +64,13 @@ async def set_sidebar_elements(title: str, artifacts: List[Any]):
                 
                 content = "\n".join(md_lines)
                 new_elements.append(
-                    cl.Text(content=content, name="Arama Sonuçları", display="side")
+                    cl.Text(content=content, name=f"Arama Sonuçları-{base_count + i + 1}", display="side")
                 )
 
             # 5. Düz Metin / HTML (Fallback)
             elif isinstance(item, str):
                 new_elements.append(
-                    cl.Text(content=item, name="Metin Çıktısı", display="side")
+                    cl.Text(content=item, name=f"Metin Çıktısı-{base_count + i + 1}", display="side")
                 )
                 
         except Exception as e:
