@@ -9,3 +9,6 @@ openpyxl
 python-dotenv
 numpy
 plotly
+trafilatura
+pydantic
+json_repair

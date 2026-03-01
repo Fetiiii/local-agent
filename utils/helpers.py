@@ -1,60 +1,49 @@
-# utils/helpers.py
 import json
-import re
-import chainlit as cl
-from typing import Dict, Optional, Any
+from typing import Optional, Dict, Any
+from json_repair import repair_json
+from backend.core.schemas import AgentAction
 
-def extract_json(text: str) -> Optional[Dict[str, Any]]:
-    """JSON veya Python Code Block yakalar ve doğrular."""
-    text = text.strip()
-    
-    # 1. Temiz JSON kontrolü
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-
-    # 2. Markdown JSON Bloğu (```json ... ```)
-    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-    if match:
+def safe_db_call(func):
+    """Decorator to handle database errors safely."""
+    def wrapper(*args, **kwargs):
         try:
-            return json.loads(match.group(1))
-        except json.JSONDecodeError:
-            pass
-    
-    # 3. Fallback: Model direkt Python kodu yazdıysa, onu tool call'a çevir
-    code_match = re.search(r"```(?:python)?\s*(.*?)\s*```", text, re.DOTALL)
-    if code_match:
-        code = code_match.group(1)
-        if len(code) > 20 and any(keyword in code for keyword in ["import", "print", "plt.", "pd."]):
-            return {
-                "thought": "Model generated code directly. Auto-wrapping in data_analyst.",
-                "tool_name": "data_analyst",
-                "tool_args": {"code": code},
-                "final_answer": None
-            }
-
-    # 4. Metin içindeki ilk ve son süslü parantez aralığı
-    match = re.search(r"(\{.*\})", text, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(1))
-        except json.JSONDecodeError:
-            pass
-        
-    return None
-
-async def safe_db_call(func, *args, **kwargs):
-    """Veritabanı işlemlerini güvenli bir şekilde yürütür ve hataları loglar."""
-    try:
-        if func and callable(func):
             return func(*args, **kwargs)
-        print(f"⚠️ safe_db_call: Function {func} is not callable.")
-        return None
+        except Exception as e:
+            print(f"❌ Database Error: {e}")
+            return None
+    return wrapper
+
+def extract_json(response_str: str) -> Optional[Dict[str, Any]]:
+    """
+    Parses and validates the LLM's JSON response using Pydantic.
+    Handles partial JSON, missing braces, and extra text.
+    """
+    try:
+        # 1. Repair JSON (Handles missing brackets, trailing commas, etc.)
+        # json_repair tries to find the JSON object within the text automatically.
+        repaired_json_str = repair_json(response_str)
+        
+        if not repaired_json_str:
+            print("⚠️ No valid JSON found in response.")
+            return None
+
+        # 2. Parse into Python Dict
+        parsed_dict = json.loads(repaired_json_str)
+
+        # BUGFIX: Handle legacy model generations (tool_name instead of tool_calls)
+        if "tool_name" in parsed_dict and "tool_calls" not in parsed_dict:
+            parsed_dict["tool_calls"] = [{"name": parsed_dict["tool_name"], "args": parsed_dict.get("tool_args", {})}]
+            parsed_dict.pop("tool_name", None)
+            parsed_dict.pop("tool_args", None)
+
+        # 3. Validate with Pydantic Schema
+        # This ensures 'thought', 'tool_calls' etc. are present and correct types.
+        action = AgentAction(**parsed_dict)
+        
+        # Return as dict for compatibility with existing code
+        return action.model_dump()
+
     except Exception as e:
-        print(f"❌ Database Error: {e}")
-        try:
-            await cl.Message(content=f"⚠️ Veritabanı Hatası: {str(e)}").send()
-        except:
-            pass
+        print(f"❌ JSON Validation Error: {e}")
+        # Optional: Return a fallback action or just None
         return None

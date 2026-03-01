@@ -26,13 +26,10 @@ from backend.database.db import Database
 from backend.tools import ToolRegistry
 from backend.tools.data_analyst import DataAnalystTool
 from backend.tools.web_search import WebSearchTool
+from backend.tools.web_scraper import WebScraperTool
 from backend.tools.file_writer import FileWriterTool
 from backend.tools.image_analysis import ImageAnalysisTool
 from backend.tools.project_scaffolder import ProjectScaffolderTool
-
-# SQLite listeleri ve sözlükleri direkt alamaz, bu yüzden JSON adaptörleri ekliyoruz.
-sqlite3.register_adapter(list, lambda lst: json.dumps(lst))
-sqlite3.register_adapter(dict, lambda dct: json.dumps(dct))
 
 from chainlit.data.sql_alchemy import SQLAlchemyDataLayer
 
@@ -98,6 +95,7 @@ async def start():
         registry = ToolRegistry()
         registry.register(DataAnalystTool())
         registry.register(WebSearchTool())
+        registry.register(WebScraperTool())
         registry.register(FileWriterTool())
         registry.register(ProjectScaffolderTool())
         registry.register(ImageAnalysisTool(model_name=config.VISION_MODEL))
@@ -191,6 +189,7 @@ async def on_chat_resume(thread):
     # Toolları tekrar register et
     registry.register(DataAnalystTool())
     registry.register(WebSearchTool())
+    registry.register(WebScraperTool())
     registry.register(FileWriterTool())
     registry.register(ProjectScaffolderTool())
     registry.register(ImageAnalysisTool(model_name=config.VISION_MODEL))

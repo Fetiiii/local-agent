@@ -1,6 +1,9 @@
-# config.py
+# config.py - Now just a proxy to backend.core.settings
 
-MODEL_NAME: str = "gpt-oss:20b"
-VISION_MODEL: str = "qwen3-vl:2b"
-RETRY_COUNT: int = 3
-MAX_STEPS: int = 5
+from backend.core.settings import settings
+
+# Proxy variables for backward compatibility
+MODEL_NAME = settings.model_name
+VISION_MODEL = settings.vision_model
+RETRY_COUNT = settings.retry_count
+MAX_STEPS = settings.max_steps

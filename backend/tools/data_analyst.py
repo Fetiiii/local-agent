@@ -4,6 +4,7 @@ import os
 import contextlib
 import uuid
 from typing import Dict, Any, List
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as PyTimeoutError
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -53,7 +54,16 @@ class DataAnalystTool:
             # Code execution
             with contextlib.redirect_stdout(stdout_buffer):
                 # exec içinde local_vars sözlüğünü kullanarak değişkenleri yakalıyoruz
-                exec(code, self.globals, local_vars)
+                # Güvenlik için timeout mekanizması ekliyoruz
+                def run_exec():
+                    exec(code, self.globals, local_vars)
+                
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(run_exec)
+                    try:
+                        future.result(timeout=60) # 60 saniye timeout (Infinite loop engelleyici)
+                    except PyTimeoutError:
+                        raise TimeoutError("Code execution timed out after 60 seconds (Possible infinite loop).")
             
             # STATE PERSISTENCE: Update globals so variables live across calls
             self.globals.update(local_vars)

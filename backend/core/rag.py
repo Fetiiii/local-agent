@@ -1,12 +1,15 @@
 import os
 import uuid
+from pathlib import Path
 from typing import List, Dict, Any
 import chromadb
 from chromadb.utils import embedding_functions
 from sentence_transformers import SentenceTransformer
+from llama_index.core.node_parser import SentenceSplitter
 
 # ChromaDB ve Model Ayarları
-VECTOR_DB_PATH = os.path.join(os.getcwd(), "data", "vector_store")
+BASE_DIR = Path(__file__).parent.parent.parent
+VECTOR_DB_PATH = str(BASE_DIR / "data" / "vector_store")
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 
 class RAGManager:
@@ -78,42 +81,19 @@ class RAGManager:
                     name="local_knowledge",
                     embedding_function=self.ef
                 )
-            except:
-                pass
+            except Exception as e2:
+                print(f"⚠️ RAG Collection Refresh Hatası: {e2}")
         return []
 
     def _split_text(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
         """
-        Basit ama etkili bir chunking (parçalama) algoritması.
-        RecursiveCharacterTextSplitter mantığına benzer.
+        LlamaIndex SentenceSplitter kullanarak düzenli ve güvenli parçalama yapar.
         """
         if not text:
             return []
             
-        chunks = []
-        start = 0
-        text_len = len(text)
-        
-        while start < text_len:
-            end = start + chunk_size
-            
-            # Eğer sona gelmediysek ve kelime ortasındaysak, en yakın boşluğa geri git
-            if end < text_len:
-                # Geriye doğru boşluk ara
-                while end > start and text[end] not in [' ', '\n', '.', ',']:
-                    end -= 1
-                # Eğer hiç boşluk bulamazsa mecburen chunk_size kadar kes (kelime çok uzunsa)
-                if end == start:
-                    end = start + chunk_size
-            
-            chunk = text[start:end].strip()
-            if chunk:
-                chunks.append(chunk)
-            
-            # Overlap (örtüşme) payı ile bir sonraki parçaya geç
-            start = end - overlap
-            
-        return chunks
+        splitter = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=overlap)
+        return splitter.split_text(text)
 
     def clear_memory(self):
         """Hafızayı temizler (Yeni sohbet için opsiyonel)."""
