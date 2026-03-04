@@ -24,7 +24,8 @@ class ModelClient:
         temp = settings.get("Temperature", 0.7) if settings else 0.7
         options = {
             "temperature": temp,
-            "num_ctx": 8192,    
+            "num_ctx": 8192,
+            "keep_alive": -1    
         }
         
         format_param = "json" if json_mode else None

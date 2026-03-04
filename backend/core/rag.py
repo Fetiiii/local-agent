@@ -27,9 +27,13 @@ class RAGManager:
         # ama burada Chroma'nın utility'sini kullanmak en kolayı.
         self.ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name=EMBEDDING_MODEL_NAME)
         
-        # Koleksiyonu al veya yarat
+        # Koleksiyonları al veya yarat
         self.collection = self.client.get_or_create_collection(
             name="local_knowledge",
+            embedding_function=self.ef
+        )
+        self.episodic_collection = self.client.get_or_create_collection(
+            name="episodic_memory",
             embedding_function=self.ef
         )
 
@@ -56,33 +60,75 @@ class RAGManager:
 
     def search(self, query: str, n_results: int = 3) -> List[str]:
         """
-        Sorgu ile en alakalı metin parçalarını getirir.
+        Sorgu ile en alakalı metin parçalarını (local doc) VE eski episodic anıları getirir.
         """
+        combined_results = []
         try:
-            # Koleksiyonun varlığını ve geçerliliğini kontrol et
+            # 1. Local Knowledge (Docs) Search
             if not hasattr(self, "collection") or self.collection is None:
                 self.collection = self.client.get_or_create_collection(
                     name="local_knowledge",
                     embedding_function=self.ef
                 )
 
-            results = self.collection.query(
+            doc_results = self.collection.query(
+                query_texts=[query],
+                n_results=n_results
+            )
+            if doc_results and doc_results['documents'] and doc_results['documents'][0]:
+                combined_results.extend(doc_results['documents'][0])
+                
+            # 2. Episodic Memory Search
+            if not hasattr(self, "episodic_collection") or self.episodic_collection is None:
+                self.episodic_collection = self.client.get_or_create_collection(
+                    name="episodic_memory",
+                    embedding_function=self.ef
+                )
+                
+            epi_results = self.episodic_collection.query(
                 query_texts=[query],
                 n_results=n_results
             )
             
-            if results and results['documents']:
-                return results['documents'][0]
+            if epi_results and epi_results['documents'] and epi_results['documents'][0]:
+                for doc, meta in zip(epi_results['documents'][0], epi_results['metadatas'][0]):
+                    ts = meta.get("timestamp", "Unknown time")
+                    combined_results.append(f"[Past Conversation at {ts}]:\n{doc}")
+
         except Exception as e:
             print(f"⚠️ RAG Search Hatası: {e}")
-            # Hata durumunda koleksiyonu yenilemeyi dene
             try:
-                self.collection = self.client.get_or_create_collection(
-                    name="local_knowledge",
-                    embedding_function=self.ef
-                )
+                self.collection = self.client.get_or_create_collection(name="local_knowledge", embedding_function=self.ef)
+                self.episodic_collection = self.client.get_or_create_collection(name="episodic_memory", embedding_function=self.ef)
             except Exception as e2:
                 print(f"⚠️ RAG Collection Refresh Hatası: {e2}")
+                
+        return combined_results
+
+    def add_episodic_memory(self, summary_text: str, timestamp: str):
+        """Kaydedilen konuşma özetlerini (Medium-Term Memory) Episodic DB'ye ekler."""
+        if not summary_text.strip():
+            return
+            
+        doc_id = str(uuid.uuid4())
+        self.episodic_collection.add(
+            documents=[summary_text],
+            metadatas=[{"timestamp": timestamp, "type": "conversation_summary"}],
+            ids=[doc_id]
+        )
+        print(f"📖 Episodic hafızaya yeni anı eklendi: {timestamp}")
+
+    def search_episodic_memory(self, query: str, n_results: int = 3) -> List[str]:
+        """Eski konuşma anılarını RAG ile getirir."""
+        try:
+            results = self.episodic_collection.query(
+                query_texts=[query],
+                n_results=n_results
+            )
+            if results and results['documents'] and results['documents'][0]:
+                return results['documents'][0]
+        except Exception as e:
+            print(f"⚠️ Episodic Search Hatası: {e}")
         return []
 
     def _split_text(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:

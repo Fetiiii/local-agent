@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Optional
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
-# Point to the root chainlit.db
-DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent.parent / "chainlit.db"
+# Point to the data/temp/chainlit.db
+DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "temp" / "chainlit.db"
 
 
 class Database:
@@ -21,7 +21,8 @@ class Database:
         self.connect()
 
     def connect(self) -> None:
-        # No need to create parent dir as chainlit.db is in root and likely exists or will be created
+        # Ensure parent directory exists
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         

@@ -1,6 +1,8 @@
 import chainlit as cl
 from typing import List, Dict
 import json
+from datetime import datetime
+from backend.core.reflection_agent import ReflectionAgent
 
 class MemoryManager:
     def __init__(self, max_recent_messages: int = 10):
@@ -114,6 +116,16 @@ class MemoryManager:
             
             new_summary = response.strip()
             print(f"✅ Memory Summarized. Length: {len(new_summary)} chars.")
+            
+            # --- Tier 2: Episodic Memory (ChromaDB) ---
+            rag_manager = cl.user_session.get("rag_manager")
+            if rag_manager:
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                rag_manager.add_episodic_memory(conversation_text, timestamp)
+            
+            # --- Tier 3: Semantic Long-Term Profile (Reflection) ---
+            reflection_agent = ReflectionAgent()
+            await reflection_agent.extract_and_update(conversation_text)
             
             # Update Session
             cl.user_session.set("summary", new_summary)

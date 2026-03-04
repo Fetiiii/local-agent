@@ -30,6 +30,7 @@ from backend.tools.web_scraper import WebScraperTool
 from backend.tools.file_writer import FileWriterTool
 from backend.tools.image_analysis import ImageAnalysisTool
 from backend.tools.project_scaffolder import ProjectScaffolderTool
+from backend.tools.shell_executor import ShellExecutorTool
 
 from chainlit.data.sql_alchemy import SQLAlchemyDataLayer
 
@@ -61,7 +62,7 @@ async def start():
         Select(
             id="Model",
             label="🤖 LLM Modeli (Ollama)",
-            values=["gpt-oss:20b", "glmtest"],
+            values=["hf.co/unsloth/gpt-oss-20b-GGUF:Q6_K","hf.co/bartowski/zai-org_GLM-4.7-Flash-GGUF:Q4_K_M", "hf.co/unsloth/Qwen3.5-9B-GGUF:Q6_K","hf.co/unsloth/Qwen3-Coder-Next-GGUF:UD-IQ3_XXS"],
             initial_value=config.MODEL_NAME,
         ),
         Switch(
@@ -98,12 +99,13 @@ async def start():
         registry.register(WebScraperTool())
         registry.register(FileWriterTool())
         registry.register(ProjectScaffolderTool())
+        registry.register(ShellExecutorTool())
         registry.register(ImageAnalysisTool(model_name=config.VISION_MODEL))
         # ---------------------------
 
         # Session Storage
         cl.user_session.set("model", model)
-        cl.user_session.set("rag", rag)
+        cl.user_session.set("rag_manager", rag)
         cl.user_session.set("ingestor", ingestor)
         cl.user_session.set("db", db)
         cl.user_session.set("tool_registry", registry)
@@ -148,7 +150,7 @@ async def main(message: cl.Message):
         db = Database()
         cl.user_session.set("db", db)
 
-    rag = cl.user_session.get("rag")
+    rag = cl.user_session.get("rag_manager")
     memory = cl.user_session.get("memory_manager")
     
     # Thread ID Chainlit'ten gelir
@@ -192,11 +194,12 @@ async def on_chat_resume(thread):
     registry.register(WebScraperTool())
     registry.register(FileWriterTool())
     registry.register(ProjectScaffolderTool())
+    registry.register(ShellExecutorTool())
     registry.register(ImageAnalysisTool(model_name=config.VISION_MODEL))
 
     # 2. Session'ı güncelle
     cl.user_session.set("model", model)
-    cl.user_session.set("rag", rag)
+    cl.user_session.set("rag_manager", rag)
     cl.user_session.set("db", db)
     cl.user_session.set("tool_registry", registry)
     cl.user_session.set("memory_manager", memory)

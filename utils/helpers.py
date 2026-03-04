@@ -13,12 +13,13 @@ def safe_db_call(func):
             return None
     return wrapper
 
-def extract_json(response_str: str) -> Optional[Dict[str, Any]]:
+def extract_json(response_str: str, schema_cls: Any = AgentAction) -> Optional[Dict[str, Any]]:
     """
-    Parses and validates the LLM's JSON response using Pydantic.
+    Parses and validates the LLM's JSON response using the given Pydantic schema.
     Handles partial JSON, missing braces, and extra text.
     """
     try:
+        print(f"DEBUG: Raw LLM Response: {response_str}")
         # 1. Repair JSON (Handles missing brackets, trailing commas, etc.)
         # json_repair tries to find the JSON object within the text automatically.
         repaired_json_str = repair_json(response_str)
@@ -37,11 +38,13 @@ def extract_json(response_str: str) -> Optional[Dict[str, Any]]:
             parsed_dict.pop("tool_args", None)
 
         # 3. Validate with Pydantic Schema
-        # This ensures 'thought', 'tool_calls' etc. are present and correct types.
-        action = AgentAction(**parsed_dict)
-        
-        # Return as dict for compatibility with existing code
-        return action.model_dump()
+        if schema_cls == AgentAction:
+            action = schema_cls(**parsed_dict)
+            return action.model_dump()
+        else:
+            # For Reflection Agent and generic schemas
+            action = schema_cls(**parsed_dict)
+            return action.model_dump()
 
     except Exception as e:
         print(f"❌ JSON Validation Error: {e}")

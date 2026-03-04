@@ -55,8 +55,13 @@ async def run_tool(name: str, args: Dict[str, Any], registry: ToolRegistry) -> s
         # cl.make_async(func) -> async_func
         print(f"🔧 Running tool: {name} with args: {run_kwargs}")
         
-        # Tool execution (Blocking ise thread'e al, async ise bekle)
-        result = await cl.make_async(tool.run)(**run_kwargs)
+        # Tool execution: async tools (e.g. shell_executor) are awaited directly;
+        # blocking sync tools are offloaded to a thread pool via cl.make_async.
+        import asyncio
+        if asyncio.iscoroutinefunction(tool.run):
+            result = await tool.run(**run_kwargs)
+        else:
+            result = await cl.make_async(tool.run)(**run_kwargs)
 
         # 4. Sonuç İşleme (Sidebar Kontrolü)
         # Yeni Protokol: { "text": "...", "artifacts": [...] }

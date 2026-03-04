@@ -32,7 +32,7 @@
 
   Change safety rules
 
-- Backward Compatibility: When modifying AgentAction schema, ensure existing extract_json logic in helpers.py can still parse older message formats stored in chainlit.db.
+- Backward Compatibility: When modifying AgentAction schema, ensure existing extract_json logic in helpers.py can still parse older message formats stored in data/temp/chainlit.db.
 - Path Safety: Tools writing to disk (Scaffolder, Writer) MUST use os.path.basename or validate that paths do not contain .. to prevent directory traversal.
 - RAG Integrity: Do not modify UniversalIngestor parsers without verifying they still output valid Markdown, as the RAG search depends on Markdown structure for chunking.
 
