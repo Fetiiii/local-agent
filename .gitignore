@@ -2,9 +2,4 @@ __pyacache__
 __pypackages__/
 .chainlit/
 data/
-.env/
-GEMINI.MD
-chainlit.db
-chainlit.db-shm
-chainlit.db-wal
-chainlit.sqbpro
+.env
