@@ -11,7 +11,7 @@ class AgentAction(BaseModel):
     Schema for the Agent's decision output.
     Supports parallel tool calls, a planning step, and Multi-Agent delegation routing.
     """
-    thought: str = Field(..., description="Detailed reasoning behind the action.")
+    thought: Optional[str] = Field(None, description="Detailed reasoning behind the action.")
     plan: Optional[List[str]] = Field(default_factory=list, description="Step-by-step strategy for solving the request.")
     route_to: Optional[str] = Field(None, description="In Multi-Agent mode, the sub-agent to delegate to (e.g. 'CoderAgent', 'ResearcherAgent'). Null if using tools or answering directly.")
     instruction: Optional[str] = Field(None, description="In Multi-Agent mode, the specific directive/task snippet for the delegated sub-agent.")

@@ -11,7 +11,7 @@ load_dotenv()
 
 # Config & Modüller
 import config
-from utils.helpers import safe_db_call
+from utils.helpers import safe_db_call, get_ollama_models
 from utils.ingestion_handler import handle_uploads
 from utils.agent_engine import run_agent_loop
 from utils.memory_manager import MemoryManager
@@ -58,12 +58,20 @@ def auth(username, password):
 async def start():
     """Uygulama başlangıcında servisleri ve session'ı ilklendirir."""
     # --- ChatSettings Tanımlama ---
+    # Ollama modellerini dinamik olarak çek
+    ollama_models = await get_ollama_models()
+    
+    # Varsayılan model listede yoksa ekle veya listenin ilkini seç
+    initial_model = config.MODEL_NAME
+    if initial_model not in ollama_models:
+        initial_model = ollama_models[0] if ollama_models else "hf.co/unsloth/gpt-oss-20b-GGUF:Q6_K"
+
     settings = await cl.ChatSettings([
         Select(
             id="Model",
             label="🤖 LLM Modeli (Ollama)",
-            values=["hf.co/unsloth/gpt-oss-20b-GGUF:Q6_K","hf.co/bartowski/zai-org_GLM-4.7-Flash-GGUF:Q4_K_M", "hf.co/unsloth/Qwen3.5-9B-GGUF:Q6_K","hf.co/unsloth/Qwen3-Coder-Next-GGUF:UD-IQ3_XXS"],
-            initial_value=config.MODEL_NAME,
+            values=ollama_models,
+            initial_value=initial_model,
         ),
         Switch(
             id="MultiAgent",
@@ -81,13 +89,11 @@ async def start():
     ]).send()
     
     cl.user_session.set("settings", settings)
-    # ------------------------------
-    
-    """Uygulama başlangıcında servisleri ve session'ı ilklendirir."""
+    # --- Servisleri Başlat ---
     print("🚀 Chat starting...")
     try:
-        # Servisleri başlat
-        model = ModelClient(model_name=config.MODEL_NAME)
+        # Servisleri başlat (seçilen veya belirlenen initial_model ile)
+        model = ModelClient(model_name=initial_model)
         rag = RAGManager()
         ingestor = UniversalIngestor()
         db = Database()

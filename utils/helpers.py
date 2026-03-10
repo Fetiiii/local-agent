@@ -1,7 +1,37 @@
 import json
-from typing import Optional, Dict, Any
+import ollama
+from typing import Optional, Dict, Any, List
 from json_repair import repair_json
 from backend.core.schemas import AgentAction
+
+async def get_ollama_models() -> List[str]:
+    """Fetches all locally downloaded models from Ollama."""
+    try:
+        client = ollama.AsyncClient()
+        response = await client.list()
+        
+        # Ollama kütüphanesi versiyonuna göre response bir dict veya obje olabilir
+        models_data = []
+        if isinstance(response, dict):
+            models_data = response.get('models', [])
+        else:
+            models_data = getattr(response, 'models', [])
+
+        models = []
+        for m in models_data:
+            # Hem 'model' hem 'name' anahtarlarını/özelliklerini kontrol et
+            if isinstance(m, dict):
+                name = m.get('model') or m.get('name')
+            else:
+                name = getattr(m, 'model', None) or getattr(m, 'name', None)
+            
+            if name:
+                models.append(name)
+
+        return sorted(models) if models else ["hf.co/unsloth/gpt-oss-20b-GGUF:Q6_K"]
+    except Exception as e:
+        print(f"❌ Ollama Model List Error: {e}")
+        return ["hf.co/unsloth/gpt-oss-20b-GGUF:Q6_K"]
 
 def safe_db_call(func):
     """Decorator to handle database errors safely."""

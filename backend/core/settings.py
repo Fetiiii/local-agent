@@ -4,7 +4,7 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # Core Application Settings
-    model_name: str = Field("gpt-oss:20b", env="MODEL_NAME")
+    model_name: str = Field("", env="MODEL_NAME")
     vision_model: str = Field("qwen3-vl:2b", env="VISION_MODEL")
     chainlit_database_url: Optional[str] = Field(None, env="CHAINLIT_DATABASE_URL")
     
