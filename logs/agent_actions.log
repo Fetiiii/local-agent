@@ -1,0 +1,85 @@
+[22:11] list_tree C:\Users\cagri\AppData\Local\Temp\tmprruxi3an
+[22:11] read_lines file.py 1-3
+[22:11] read_lines file.py 2-2
+[22:11] file_architect create pkg/__init__.py
+[22:11] file_architect create pkg/config.json
+[22:11] file_architect create pkg/README.md
+[22:11] file_architect skip pkg/README.md — File already exists. Pass overwrite=True to replace it.
+[22:11] file_architect create pkg/README.md
+[22:11] file_architect skip broken.py — Python syntax error: '(' was never closed | line 1 | col 8 | def foo(
+
+[22:11] file_architect skip ../../escape.txt — Path '../../escape.txt' resolves to 'C:\Users\cagri\AppData\Local\escape.txt' which is outside the allowed root 'C:\Users\cagri\AppData\Local\Temp\tmpq6cy06ng'. Directory traversal is not permitted.
+[22:11] file_surgeon replace app.py (tier=exact)
+[22:11] ApprovalManager initialised with auto_approve=True — all changes will be written without human review.
+[22:11] approval auto-approved: dummy.py
+[22:11] approval REJECTED: x.py (test rejection)
+[22:11] approval EDITED: y.py (test edit)
+[22:11] backup created 20260315_221115_67edb2 — 1 file(s) for 'test backup'
+[22:11] restore important.py from backup 20260315_221115_67edb2
+[22:13] list_tree C:\Users\cagri\AppData\Local\Temp\tmpu9o4ub1e
+[22:13] read_lines file.py 1-3
+[22:13] read_lines file.py 2-2
+[22:13] file_architect create pkg/__init__.py
+[22:13] file_architect create pkg/config.json
+[22:13] file_architect create pkg/README.md
+[22:13] file_architect skip pkg/README.md — File already exists. Pass overwrite=True to replace it.
+[22:13] file_architect create pkg/README.md
+[22:13] file_architect skip broken.py — Python syntax error: '(' was never closed | line 1 | col 8 | def foo(
+
+[22:13] file_architect skip ../../escape.txt — Path '../../escape.txt' resolves to 'C:\Users\cagri\AppData\Local\escape.txt' which is outside the allowed root 'C:\Users\cagri\AppData\Local\Temp\tmpnd2760eb'. Directory traversal is not permitted.
+[22:13] file_surgeon replace app.py (tier=exact)
+[22:13] file_surgeon replace vars.py (tier=normalised-whitespace)
+[22:13] ApprovalManager initialised with auto_approve=True — all changes will be written without human review.
+[22:13] approval auto-approved: dummy.py
+[22:13] approval REJECTED: x.py (test rejection)
+[22:13] approval EDITED: y.py (test edit)
+[22:13] backup created 20260315_221356_547948 — 1 file(s) for 'test backup'
+[22:13] restore important.py from backup 20260315_221356_547948
+[10:53] list_tree C:\Users\cagri\OneDrive\Desktop\projects\gptoss\lokal-agent\data\exports
+[11:07] list_tree C:\Users\cagri\OneDrive\Desktop\projects\gptoss\lokal-agent\data\exports
+[11:07] file_architect create data\exports\check.py
+[16:21] list_tree C:\Users\cagri\OneDrive\Desktop\projects\gptoss\lokal-agent\data\exports
+[16:21] file_architect create demo_project/config.json
+[16:21] file_architect create demo_project/app.py
+[16:21] file_architect create demo_project/README.md
+[16:21] read_lines app.py 1-5
+[16:21] file_surgeon replace app.py (tier=exact)
+[16:21] backup created 20260316_162135_9cc904 — 1 file(s) for 'demo: pre-restore snapshot'
+[16:21] restore app.py from backup 20260316_162135_9cc904
+[16:21] ApprovalManager initialised with auto_approve=True — all changes will be written without human review.
+[16:21] approval auto-approved: example.py
+[16:23] list_tree C:\Users\cagri\OneDrive\Desktop\projects\gptoss\lokal-agent\data\exports
+[16:23] file_architect skip demo_project/config.json — File already exists. Pass overwrite=True to replace it.
+[16:23] file_architect skip demo_project/app.py — File already exists. Pass overwrite=True to replace it.
+[16:23] file_architect skip demo_project/README.md — File already exists. Pass overwrite=True to replace it.
+[16:23] read_lines app.py 1-5
+[16:23] backup created 20260316_162342_1ef3fd — 1 file(s) for 'demo: pre-restore snapshot'
+[16:23] restore app.py from backup 20260316_162342_1ef3fd
+[16:23] approval APPROVED: example.py (user approved)
+[16:24] list_tree C:\Users\cagri\OneDrive\Desktop\projects\gptoss\lokal-agent\data\exports
+[16:24] file_architect skip demo_project/config.json — File already exists. Pass overwrite=True to replace it.
+[16:24] file_architect skip demo_project/app.py — File already exists. Pass overwrite=True to replace it.
+[16:24] file_architect skip demo_project/README.md — File already exists. Pass overwrite=True to replace it.
+[16:24] read_lines app.py 1-5
+[16:24] backup created 20260316_162411_e8f951 — 1 file(s) for 'demo: pre-restore snapshot'
+[16:24] restore app.py from backup 20260316_162411_e8f951
+[16:24] approval APPROVED: example.py (user approved)
+[16:30] list_tree C:\Users\cagri\OneDrive\Desktop\projects\gptoss\lokal-agent\data\exports
+[16:30] file_architect skip demo_project/config.json — File already exists. Pass overwrite=True to replace it.
+[16:30] file_architect skip demo_project/app.py — File already exists. Pass overwrite=True to replace it.
+[16:30] file_architect skip demo_project/README.md — File already exists. Pass overwrite=True to replace it.
+[16:30] read_lines app.py 1-5
+[16:30] backup created 20260316_163054_7d9b69 — 1 file(s) for 'demo: pre-restore snapshot'
+[16:30] restore app.py from backup 20260316_163054_7d9b69
+[16:30] ApprovalManager initialised with auto_approve=True — all changes will be written without human review.
+[16:30] approval auto-approved: example.py
+[16:31] list_tree C:\Users\cagri\OneDrive\Desktop\projects\gptoss\lokal-agent\data\exports
+[16:31] file_architect create demo_project/config.json
+[16:31] file_architect create demo_project/app.py
+[16:31] file_architect create demo_project/README.md
+[16:31] read_lines app.py 1-5
+[16:31] file_surgeon replace app.py (tier=exact)
+[16:31] backup created 20260316_163118_f09c21 — 1 file(s) for 'demo: pre-restore snapshot'
+[16:31] restore app.py from backup 20260316_163118_f09c21
+[16:31] ApprovalManager initialised with auto_approve=True — all changes will be written without human review.
+[16:31] approval auto-approved: example.py

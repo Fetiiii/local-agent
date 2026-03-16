@@ -16,17 +16,20 @@ INSTRUCTIONS:
 TOOL DEFINITIONS:
 1. 'data_analyst': Execute Python for analysis/plotting. Persistent state.
    Args: {"code": "python_code_here"}
-2. 'file_writer': Save a SINGLE file.
-   Args: {"filename": "example.txt", "content": "text_content_here"}
-3. 'project_scaffolder': Create MULTIPLE files/directories at once.
-   Args: {"files": {"path/to/file1.py": "content1", "src/main.py": "content2"}}
-4. 'web_search': Search titles/links. Use 'web_scraper' to read them.
+2. 'file_reader_v2': Read files or list directory trees safely. Use to explore codebase.
+   Args: {"action": "list_tree", "path": "dir_path"} OR {"action": "read_lines", "path": "file.py", "start_line": 1, "end_line": 100}
+3. 'file_architect': Create multiple NEW files/directories atomically. Refuses to overwrite unless 'overwrite' is true.
+   Args: {"files": {"path/to/file1.py": "content1"}, "overwrite": false}
+4. 'file_surgeon': Edit EXISTING files cleanly. Uses exact or whitespace-tolerant match to find and replace block. 
+   Include EXACT lines from the file (read them first if needed!). No truncating context.
+   Args: {"path": "file.py", "search_block": "old code", "replace_block": "new code"}
+5. 'web_search': Search titles/links. Use 'web_scraper' to read them.
    Args: {"query": "search_query"}
-5. 'web_scraper': READ content of a URL.
+6. 'web_scraper': READ content of a URL.
    Args: {"url": "https://..."}
-6. 'image_analysis': Analyze uploaded images.
+7. 'image_analysis': Analyze uploaded images.
    Args: {"image_path": "path", "prompt": "question"}
-7. 'shell_executor': Run a terminal/shell command (pip, npm, git, scripts, etc.).
+8. 'shell_executor': Run a terminal/shell command (pip, npm, git, scripts, etc.).
    CWD is always inside data/exports/. Use 'cwd' to target a sub-folder.
    Args: {"command": "pip install pandas", "cwd": "myproject", "timeout": 30}
 
@@ -73,9 +76,12 @@ You MUST output strictly in JSON format.
 
 YOUR EXCLUSIVE TOOLS:
 1. 'data_analyst': Execute Python (persistent environment). Args: {"code": "pycode"}
-2. 'file_writer': Save a single file. Args: {"filename": "name", "content": "..."}
-3. 'project_scaffolder': Generate multiple files. Args: {"files": {"path": "content"}}
-4. 'shell_executor': Run shell commands (pip, npm, git, scripts). CWD is data/exports/.
+2. 'file_reader_v2': Explore directories & read files safely.
+   Args: {"action": "list_tree"} or {"action": "read_lines", "path": "file.py"}
+3. 'file_architect': Scaffold new files. Args: {"files": {"path": "content"}, "overwrite": false}
+4. 'file_surgeon': Edit existing files by finding and replacing a specific text block. 
+   Args: {"path": "file.py", "search_block": "exact old lines", "replace_block": "new lines"}
+5. 'shell_executor': Run shell commands (pip, npm, git, scripts). CWD is data/exports/.
    Args: {"command": "npm install", "cwd": "myproject", "timeout": 30}
 
 INSTRUCTIONS:

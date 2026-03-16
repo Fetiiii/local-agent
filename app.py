@@ -32,6 +32,11 @@ from backend.tools.image_analysis import ImageAnalysisTool
 from backend.tools.project_scaffolder import ProjectScaffolderTool
 from backend.tools.shell_executor import ShellExecutorTool
 
+# File-Editing System (Layer 1-4)
+from backend.tools.file_editing.file_reader import FileReaderTool
+from backend.tools.file_editing.file_architect import FileArchitectTool
+from backend.tools.file_editing.file_surgeon import FileSurgeonTool
+
 from chainlit.data.sql_alchemy import SQLAlchemyDataLayer
 
 # .env'den URL'yi alıyoruz
@@ -107,6 +112,9 @@ async def start():
         registry.register(ProjectScaffolderTool())
         registry.register(ShellExecutorTool())
         registry.register(ImageAnalysisTool(model_name=config.VISION_MODEL))
+        registry.register(FileReaderTool())
+        registry.register(FileArchitectTool())
+        registry.register(FileSurgeonTool())
         # ---------------------------
 
         # Session Storage
@@ -202,6 +210,9 @@ async def on_chat_resume(thread):
     registry.register(ProjectScaffolderTool())
     registry.register(ShellExecutorTool())
     registry.register(ImageAnalysisTool(model_name=config.VISION_MODEL))
+    registry.register(FileReaderTool())
+    registry.register(FileArchitectTool())
+    registry.register(FileSurgeonTool())
 
     # 2. Session'ı güncelle
     cl.user_session.set("model", model)
