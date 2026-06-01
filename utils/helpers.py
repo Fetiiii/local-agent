@@ -49,7 +49,7 @@ def extract_json(response_str: str, schema_cls: Any = AgentAction) -> Optional[D
     Handles partial JSON, missing braces, and extra text.
     """
     try:
-        print(f"DEBUG: Raw LLM Response: {response_str}")
+        print(f"[LLM] {response_str[:120]}...")
         # 1. Repair JSON (Handles missing brackets, trailing commas, etc.)
         # json_repair tries to find the JSON object within the text automatically.
         repaired_json_str = repair_json(response_str)

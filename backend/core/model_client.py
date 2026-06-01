@@ -39,7 +39,7 @@ class ModelClient:
                     messages=messages,
                     options=options,
                     format=format_param,
-                    stream=True
+                    stream=False
                 )
                 return response['message']['content']
                 

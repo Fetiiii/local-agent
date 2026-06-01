@@ -42,6 +42,42 @@ from chainlit.data.sql_alchemy import SQLAlchemyDataLayer
 # .env'den URL'yi alıyoruz
 db_url = os.getenv("CHAINLIT_DATABASE_URL")
 
+_LAST_MODEL_PATH = os.path.join("data", "memory", "last_settings.json")
+
+def _save_last_model(thread_id: str, model_name: str):
+    import json
+    os.makedirs(os.path.dirname(_LAST_MODEL_PATH), exist_ok=True)
+    try:
+        with open(_LAST_MODEL_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        data = {}
+    data[thread_id] = model_name
+    with open(_LAST_MODEL_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+def _load_last_model(thread_id: str, default: str) -> str:
+    import json
+    try:
+        with open(_LAST_MODEL_PATH, "r", encoding="utf-8") as f:
+            return json.load(f).get(thread_id, default)
+    except Exception:
+        return default
+
+def build_tool_registry() -> ToolRegistry:
+    registry = ToolRegistry()
+    registry.register(DataAnalystTool())
+    registry.register(WebSearchTool())
+    registry.register(WebScraperTool())
+    registry.register(FileWriterTool())
+    registry.register(ProjectScaffolderTool())
+    registry.register(ShellExecutorTool())
+    registry.register(ImageAnalysisTool(model_name=config.VISION_MODEL))
+    registry.register(FileReaderTool())
+    registry.register(FileArchitectTool())
+    registry.register(FileSurgeonTool())
+    return registry
+
 @cl.data_layer
 def setup_data_layer():
     db_url = os.getenv("CHAINLIT_DATABASE_URL")
@@ -103,19 +139,7 @@ async def start():
         ingestor = UniversalIngestor()
         db = Database()
 
-        # --- Tool Registry Setup ---
-        registry = ToolRegistry()
-        registry.register(DataAnalystTool())
-        registry.register(WebSearchTool())
-        registry.register(WebScraperTool())
-        registry.register(FileWriterTool())
-        registry.register(ProjectScaffolderTool())
-        registry.register(ShellExecutorTool())
-        registry.register(ImageAnalysisTool(model_name=config.VISION_MODEL))
-        registry.register(FileReaderTool())
-        registry.register(FileArchitectTool())
-        registry.register(FileSurgeonTool())
-        # ---------------------------
+        registry = build_tool_registry()
 
         # Session Storage
         cl.user_session.set("model", model)
@@ -129,8 +153,6 @@ async def start():
         # Sidebar Geçmişi (Append özelliği için)
         cl.user_session.set("sidebar_history", [])
 
-        # RAG Memory Reset
-        rag.clear_memory()
 
         await cl.Message(
             content=f"👋 **Lokal Agent Hazır!**\nModel: `{config.MODEL_NAME}`\nToollar aktif: {', '.join(registry.list_tools())}"
@@ -149,10 +171,15 @@ async def setup_agent(settings):
     new_model_name = settings["Model"]
     model = ModelClient(model_name=new_model_name)
     cl.user_session.set("model", model)
-    
+
     # 2. Ayarları session'da güncelle
     cl.user_session.set("settings", settings)
-    
+
+    # 3. Seçilen modeli thread bazlı diske kaydet (resume'da geri yüklensin)
+    thread_id = cl.context.session.thread_id
+    if thread_id:
+        _save_last_model(thread_id, new_model_name)
+
     await cl.Message(content=f"✅ Ayarlar güncellendi: `{new_model_name}` aktif.").send()
 
 @cl.on_message
@@ -195,24 +222,13 @@ async def on_chat_resume(thread):
     """Sidebar'dan eski bir sohbete tıklandığında çalışır."""
     print(f"♻️ Resuming conversation: {thread['id']}")
     
-    # 1. Servisleri tekrar ayağa kaldır    
-    model = ModelClient(model_name=config.MODEL_NAME)
+    # 1. Servisleri tekrar ayağa kaldır
+    last_model = _load_last_model(thread_id=thread["id"], default=config.MODEL_NAME)
+    model = ModelClient(model_name=last_model)
     rag = RAGManager()
     db = Database() 
     memory = MemoryManager(max_recent_messages=10)
-    registry = ToolRegistry()
-    
-    # Toolları tekrar register et
-    registry.register(DataAnalystTool())
-    registry.register(WebSearchTool())
-    registry.register(WebScraperTool())
-    registry.register(FileWriterTool())
-    registry.register(ProjectScaffolderTool())
-    registry.register(ShellExecutorTool())
-    registry.register(ImageAnalysisTool(model_name=config.VISION_MODEL))
-    registry.register(FileReaderTool())
-    registry.register(FileArchitectTool())
-    registry.register(FileSurgeonTool())
+    registry = build_tool_registry()
 
     # 2. Session'ı güncelle
     cl.user_session.set("model", model)

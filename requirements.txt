@@ -11,4 +11,6 @@ numpy
 plotly
 trafilatura
 pydantic
+pydantic-settings
+llama-index-core
 json_repair
