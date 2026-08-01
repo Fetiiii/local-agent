@@ -14,6 +14,9 @@ import os
 import shlex
 from pathlib import Path
 
+from backend.core.settings import settings
+from backend.tools.sandbox import sandbox, current_session_id
+
 EXPORTS_ROOT = Path("data/exports").resolve()
 TIMEOUT_SECONDS = 30
 MAX_OUTPUT_BYTES = 8192
@@ -36,8 +39,9 @@ class ShellExecutorTool:
     name = "shell_executor"
     description = (
         "Run a shell / terminal command and return its stdout + stderr. "
-        "Working directory defaults to data/exports/. "
-        "Use this for: pip install, npm, git, running scripts, etc."
+        "Runs inside an isolated Docker sandbox (working dir /workspace, which "
+        "maps to data/exports/ on the host). Use this for: pip install, npm, "
+        "git, running scripts, etc."
     )
 
     # --- Tool schema for ToolRegistry ---
@@ -69,13 +73,31 @@ class ShellExecutorTool:
         }
 
     async def run(self, command: str, cwd: str = None, timeout: int = TIMEOUT_SECONDS) -> str:
-        # --- Safety: blocklist ---
+        # --- Safety: blocklist (defense-in-depth; primary isolation is the sandbox) ---
         cmd_lower = command.strip().lower()
         for blocked in BLOCKED_PREFIXES:
             if cmd_lower.startswith(blocked):
                 return f"❌ Blocked command: '{command}' matches blocklist pattern '{blocked}'."
 
-        # --- Safety: resolve working directory ---
+        # --- Sandbox path: run inside an isolated Docker container when enabled ---
+        backend = settings.sandbox_backend.lower()
+        if sandbox.should_use():
+            if await sandbox.is_available():
+                # Docker is present → the command MUST stay sandboxed. Return
+                # whatever the sandbox produced (result or error); never silently
+                # fall back to unsandboxed host execution on a container hiccup.
+                _, out = await sandbox.exec(
+                    current_session_id(), command, timeout=timeout, workdir=cwd
+                )
+                return out
+            elif backend == "docker":
+                return (
+                    "❌ SANDBOX_BACKEND=docker but Docker is unavailable. "
+                    "Refusing to run the command on the host."
+                )
+            # backend == "auto" and Docker missing → fall through to host execution.
+
+        # --- Safety: resolve working directory (host fallback) ---
         if cwd:
             resolved_cwd = (EXPORTS_ROOT / cwd).resolve()
         else:

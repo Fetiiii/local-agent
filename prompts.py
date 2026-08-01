@@ -30,7 +30,8 @@ TOOL DEFINITIONS:
 7. 'image_analysis': Analyze uploaded images.
    Args: {"image_path": "path", "prompt": "question"}
 8. 'shell_executor': Run a terminal/shell command (pip, npm, git, scripts, etc.).
-   CWD is always inside data/exports/. Use 'cwd' to target a sub-folder.
+   Runs in an isolated Docker sandbox; CWD is /workspace (maps to data/exports/).
+   Use 'cwd' to target a sub-folder.
    Args: {"command": "pip install pandas", "cwd": "myproject", "timeout": 30}
 
 OUTPUT FORMAT (Strict JSON):
