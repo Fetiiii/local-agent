@@ -18,7 +18,7 @@ from utils.memory_manager import MemoryManager
 
 # Backend & Tools
 from backend.core.model_client import ModelClient
-from backend.core.rag import RAGManager
+from backend.core.rag import RAGManager, get_rag_manager
 from backend.ingestion.ingestor import UniversalIngestor
 from backend.database.db import Database
 
@@ -27,9 +27,7 @@ from backend.tools import ToolRegistry
 from backend.tools.data_analyst import DataAnalystTool
 from backend.tools.web_search import WebSearchTool
 from backend.tools.web_scraper import WebScraperTool
-from backend.tools.file_writer import FileWriterTool
 from backend.tools.image_analysis import ImageAnalysisTool
-from backend.tools.project_scaffolder import ProjectScaffolderTool
 from backend.tools.shell_executor import ShellExecutorTool
 
 # File-Editing System (Layer 1-4)
@@ -69,8 +67,6 @@ def build_tool_registry() -> ToolRegistry:
     registry.register(DataAnalystTool())
     registry.register(WebSearchTool())
     registry.register(WebScraperTool())
-    registry.register(FileWriterTool())
-    registry.register(ProjectScaffolderTool())
     registry.register(ShellExecutorTool())
     registry.register(ImageAnalysisTool(model_name=config.VISION_MODEL))
     registry.register(FileReaderTool())
@@ -135,7 +131,7 @@ async def start():
     try:
         # Servisleri başlat (seçilen veya belirlenen initial_model ile)
         model = ModelClient(model_name=initial_model)
-        rag = RAGManager()
+        rag = get_rag_manager()
         ingestor = UniversalIngestor()
         db = Database()
 
@@ -225,7 +221,7 @@ async def on_chat_resume(thread):
     # 1. Servisleri tekrar ayağa kaldır
     last_model = _load_last_model(thread_id=thread["id"], default=config.MODEL_NAME)
     model = ModelClient(model_name=last_model)
-    rag = RAGManager()
+    rag = get_rag_manager()
     db = Database() 
     memory = MemoryManager(max_recent_messages=10)
     registry = build_tool_registry()
@@ -245,3 +241,13 @@ async def on_chat_resume(thread):
     cl.user_session.set("history", history)
 
     await cl.Message(content="📜 Sohbet geçmişini hatırladım. Devam edebiliriz!").send()
+
+
+@cl.on_chat_end
+async def on_chat_end():
+    """Oturum bitince sandbox konteynerini temizle."""
+    try:
+        from backend.tools.sandbox import sandbox, current_session_id
+        await sandbox.destroy(current_session_id())
+    except Exception as e:
+        print(f"Sandbox cleanup error: {e}")

@@ -148,3 +148,16 @@ class RAGManager:
             name="local_knowledge",
             embedding_function=self.ef
         )
+
+
+# The embedding model + ChromaDB client are expensive to build and the vector
+# store is shared across sessions anyway — so reuse a single RAGManager instead
+# of reloading the embedding model on every chat start/resume.
+_rag_instance = None
+
+
+def get_rag_manager() -> "RAGManager":
+    global _rag_instance
+    if _rag_instance is None:
+        _rag_instance = RAGManager()
+    return _rag_instance

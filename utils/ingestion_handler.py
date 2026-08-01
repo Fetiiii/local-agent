@@ -7,7 +7,7 @@ from backend.database.db import Database
 async def handle_uploads(message: cl.Message, thread_id: str) -> str:
     """Paylaşılan çalışan kod mantığına birebir sadık kalınmıştır."""
     ingestor: UniversalIngestor = cl.user_session.get("ingestor")
-    rag: RAGManager = cl.user_session.get("rag")
+    rag: RAGManager = cl.user_session.get("rag_manager")
     db: Database = cl.user_session.get("db")
 
     # Ingestion Kısmı (Birebir kopyalandı)

@@ -15,11 +15,12 @@ class UniversalIngestor:
         self.docx_engine = DocxParser()
         self.excel_engine = ExcelParser()
 
-        # Desteklenen formatlar ve ilgili motorlar
+        # Desteklenen formatlar ve ilgili motorlar.
+        # NOT: Legacy binary ".doc" docling ile güvenilir okunamaz → desteklenmiyor
+        # (kullanıcı .docx'e çevirmeli).
         self.parsers = {
             ".pdf": self.pdf_engine,
             ".docx": self.docx_engine,
-            ".doc": self.docx_engine,
             ".xlsx": self.excel_engine,
             ".xls": self.excel_engine,
             ".csv": self.excel_engine
@@ -38,6 +39,9 @@ class UniversalIngestor:
 
         ext = path.suffix.lower()
 
+        if ext == ".doc":
+            print("⚠️ Legacy .doc desteklenmiyor — lütfen .docx'e çevirin.")
+            return None
         if ext not in self.parsers:
             print(f"⚠️ Desteklenmeyen format: {ext}")
             return None

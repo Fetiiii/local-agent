@@ -1,11 +1,16 @@
 from pathlib import Path
-from markitdown import MarkItDown
 import re
 
 class ExcelParser:
     def __init__(self):
-        # MarkItDown motorunu başlatıyoruz.
-        self.md = MarkItDown()
+        # MarkItDown lazily created on first use (see _engine).
+        self._md = None
+
+    def _engine(self):
+        if self._md is None:
+            from markitdown import MarkItDown
+            self._md = MarkItDown()
+        return self._md
 
     def parse(self, file_path: Path) -> str:
         """
@@ -14,9 +19,9 @@ class ExcelParser:
         """
         try:
             print(f"📊 Excel İşleniyor (MarkItDown): {file_path.name}")
-            
+
             # 1. Dönüştürme
-            result = self.md.convert(str(file_path))
+            result = self._engine().convert(str(file_path))
             raw_text = result.text_content
             
             # 2. Temizlik (Post-Processing)
