@@ -1,16 +1,37 @@
-chainlit
-ollama
-chromadb
-sentence-transformers
-docling
-markitdown
-pandas
-openpyxl
-python-dotenv
-numpy
-plotly
-trafilatura
-pydantic
-pydantic-settings
-llama-index-core
-json_repair
+# Pinned to versions verified working on Python 3.12.
+# Regenerate after upgrades with: uv pip install -r requirements.txt
+
+# ── Core UI & Agent ──────────────────────────────────────────────
+chainlit==2.11.1
+ollama==0.6.2
+openai==2.52.0
+pydantic==2.13.4
+pydantic-settings==2.14.2
+python-dotenv==1.2.2
+json_repair==0.61.7
+
+# ── Data layer (Chainlit SQLAlchemyDataLayer + local SQLite) ──────
+sqlalchemy==2.0.51
+aiosqlite==0.22.1
+greenlet==3.5.4
+
+# ── RAG / Embeddings / Vector store ──────────────────────────────
+chromadb==1.5.9
+sentence-transformers==5.6.1
+llama-index-core==0.14.23
+
+# ── Document ingestion (PDF / DOCX / Excel) ──────────────────────
+docling==2.117.0
+markitdown==0.1.7
+openpyxl==3.1.5
+
+# ── Data analysis tool ───────────────────────────────────────────
+pandas==3.0.5
+numpy==2.5.1
+plotly==6.9.0
+matplotlib==3.11.1
+seaborn==0.13.2
+
+# ── Web tools ────────────────────────────────────────────────────
+requests==2.34.2
+trafilatura==2.2.0

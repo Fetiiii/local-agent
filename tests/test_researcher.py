@@ -1,7 +1,15 @@
 import asyncio
-import ollama
+import sys
+from pathlib import Path
 
-MODEL = 'gpt-oss:20b'
+# Ensure project root is importable when run directly (python tests/test_researcher.py)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import ollama
+from backend.core.settings import settings
+
+# Live-model probe: uses the configured model, falls back to gpt-oss:20b.
+MODEL = settings.model_name or 'gpt-oss:20b'
 
 SHARED_FORMAT = """Reply with JSON containing:
 - "thought": your step-by-step reasoning
@@ -28,7 +36,29 @@ async def test(label, system):
     print(f"LENGTH: {len(s)}")
     print(f"RESPONSE: {repr(s[:200])}")
 
+async def _ollama_available() -> bool:
+    try:
+        resp = await ollama.AsyncClient().list()
+    except Exception as e:
+        print(f"⏭️  SKIP: Ollama not reachable ({e}). This is a live-model probe.")
+        return False
+
+    names = [getattr(m, "model", None) or (m.get("model") if isinstance(m, dict) else None)
+             for m in getattr(resp, "models", []) or resp.get("models", [])]
+    names = [n for n in names if n]
+    if not names:
+        print("⏭️  SKIP: No Ollama models pulled yet. Pull one to run this probe.")
+        return False
+    if MODEL not in names:
+        print(f"⏭️  SKIP: Model '{MODEL}' not found. Available: {names}. "
+              f"Set MODEL_NAME to one of these to run this probe.")
+        return False
+    return True
+
+
 async def main():
+    if not await _ollama_available():
+        return
     await test("A. RESEARCHER AGENT",  f"You are the RESEARCHER AGENT. {SHARED_FORMAT}")
     await test("B. CODER AGENT",       f"You are the CODER AGENT. {SHARED_FORMAT}")
     await test("C. DATA AGENT",        f"You are the DATA AGENT. {SHARED_FORMAT}")

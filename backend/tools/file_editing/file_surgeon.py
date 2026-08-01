@@ -66,9 +66,9 @@ class FileSurgeonTool:
 
     def run(
         self,
-        path: str,
-        search_block: str,
-        replace_block: str,
+        path: Optional[str] = None,
+        search_block: Optional[str] = None,
+        replace_block: Optional[str] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """
@@ -78,6 +78,17 @@ class FileSurgeonTool:
         -------
         Dict with ``text`` (status message) and optional ``diff`` preview.
         """
+        # ── Validate arguments (guide the model instead of crashing) ────────────
+        missing = [
+            n for n, v in (("path", path), ("search_block", search_block),
+                           ("replace_block", replace_block)) if v is None
+        ]
+        if missing:
+            return {"text": (
+                f"❌ file_surgeon is missing required argument(s): {', '.join(missing)}. "
+                "Call it with path, search_block (exact lines from the file), and replace_block."
+            )}
+
         # ── Resolve path ───────────────────────────────────────────────────────
         try:
             target = self._resolver.resolve(path)

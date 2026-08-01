@@ -32,12 +32,6 @@ async def run_tool(name: str, args: Dict[str, Any], registry: ToolRegistry) -> s
         
         elif name == "data_analyst":
             run_kwargs = {"code": args.get("code", "")}
-            
-        elif name == "file_writer":
-            run_kwargs = {
-                "filename": args.get("filename"), 
-                "content": args.get("content")
-            }
 
         elif name == "image_analysis":
             img_path = args.get("image_path") or args.get("path")
@@ -70,11 +64,12 @@ async def run_tool(name: str, args: Dict[str, Any], registry: ToolRegistry) -> s
 
         # 4. Tool'u Thread Pool'da Çalıştır (UI Bloklanmasın)
         # cl.make_async(func) -> async_func
-        print(f"🔧 Running tool: {name} with args: {run_kwargs}")
-        
         # Tool execution: async tools (e.g. shell_executor) are awaited directly;
         # blocking sync tools are offloaded to a thread pool via cl.make_async.
         import asyncio
+        from backend.core.settings import settings
+        if settings.debug:
+            print(f"🔧 Running tool: {name} with args: {run_kwargs}")
         if asyncio.iscoroutinefunction(tool.run):
             result = await tool.run(**run_kwargs)
         else:
@@ -104,6 +99,12 @@ async def run_tool(name: str, args: Dict[str, Any], registry: ToolRegistry) -> s
 
         return str(result)
 
+    except TypeError as e:
+        # Usually the model passed wrong/missing arguments — guide it, don't crash.
+        return (
+            f"❌ Invalid arguments for tool '{name}': {e}. "
+            "Check the tool's required arguments and try again."
+        )
     except Exception as e:
         import traceback
         traceback.print_exc()

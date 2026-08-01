@@ -1,4 +1,5 @@
 import chainlit as cl
+import asyncio
 from typing import List, Dict
 import json
 from datetime import datetime
@@ -15,19 +16,16 @@ class MemoryManager:
 
     async def get_formatted_history(self, thread_id: str = None) -> List[Dict]:
         """
-        Retrieves history, handling summarization if the conversation gets too long.
+        Retrieves history for the prompt (fast, non-blocking).
         Returns: [Summary (System Msg)] + [Recent Messages]
+
+        NOTE: Summarization is NOT triggered here anymore — it runs in the
+        background (see `schedule_summarization`) so it never blocks a turn.
+        Context stays bounded because we only ever send the last N messages
+        plus the rolling summary.
         """
         history = cl.user_session.get("history") or []
         summary = cl.user_session.get("summary") or ""
-        
-        # Check if we need to summarize
-        # If history length exceeds max + buffer, we summarize the overflow
-        if len(history) > self.max_recent_messages + self.summary_buffer_size:
-            await self._summarize_old_messages()
-            # Reload updated state
-            history = cl.user_session.get("history")
-            summary = cl.user_session.get("summary")
 
         formatted_messages = []
         
@@ -59,6 +57,37 @@ class MemoryManager:
         cl.user_session.set("history", [])
         cl.user_session.set("summary", "")
 
+    # ── Background summarization ─────────────────────────────────────────────
+
+    def needs_summarization(self) -> bool:
+        history = cl.user_session.get("history") or []
+        return len(history) > self.max_recent_messages + self.summary_buffer_size
+
+    def schedule_summarization(self):
+        """
+        Fire-and-forget: if the buffer has overflowed, condense the old messages
+        in the background so the user-facing turn is never blocked. A session
+        flag prevents overlapping summarization runs.
+        """
+        if not self.needs_summarization():
+            return
+        if cl.user_session.get("summarizing"):
+            return
+        cl.user_session.set("summarizing", True)
+        try:
+            asyncio.create_task(self._run_background_summarization())
+        except RuntimeError:
+            # No running loop (e.g. tests) — clear the flag and skip.
+            cl.user_session.set("summarizing", False)
+
+    async def _run_background_summarization(self):
+        try:
+            await self._summarize_old_messages()
+        except Exception as e:
+            print(f"❌ Background summarization failed: {e}")
+        finally:
+            cl.user_session.set("summarizing", False)
+
     async def _summarize_old_messages(self):
         """
         Summarizes the oldest part of the conversation and updates the session state.
@@ -72,8 +101,8 @@ class MemoryManager:
         # So we summarize: history[:-max_recent_messages]
         
         msgs_to_summarize = history[:-self.max_recent_messages]
-        remaining_msgs = history[-self.max_recent_messages:]
-        
+        num_summarized = len(msgs_to_summarize)
+
         if not msgs_to_summarize:
             return
 
@@ -127,10 +156,13 @@ class MemoryManager:
             reflection_agent = ReflectionAgent()
             await reflection_agent.extract_and_update(conversation_text)
             
-            # Update Session
+            # Update Session (race-safe): re-read the current history, which may
+            # have grown while the LLM summarization was running, and drop only
+            # the first `num_summarized` messages we actually condensed.
+            cur_history = cl.user_session.get("history") or []
             cl.user_session.set("summary", new_summary)
-            cl.user_session.set("history", remaining_msgs)
-            
+            cl.user_session.set("history", cur_history[num_summarized:])
+
         except Exception as e:
             print(f"❌ Memory Summarization Failed: {e}")
 

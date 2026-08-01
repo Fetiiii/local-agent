@@ -1,81 +1,47 @@
-import config
-import ollama
-from typing import List, Dict, AsyncGenerator, Any, Optional, Union
-import json
-import asyncio
-import chainlit as cl
+"""
+ModelClient — thin, backend-agnostic facade over an LLMProvider.
+
+Public API is unchanged (generate / check_connection) so the rest of the app
+keeps working, but the actual runtime (Ollama, llama.cpp via OpenAI-compatible
+API, …) is chosen from settings.
+"""
+
+from __future__ import annotations
+
+from typing import AsyncGenerator, Dict, List, Optional, Union
+
+from backend.core.settings import settings
+from backend.core.providers import build_provider
+
 
 class ModelClient:
-    def __init__(self, model_name: str = config.MODEL_NAME):
-        self.model_name = model_name
-        self.client = ollama.AsyncClient()
-        print(f"🤖 Model Client Hazır: {self.model_name}")
+    def __init__(self, model_name: Optional[str] = None, provider: Optional[str] = None,
+                 temperature: Optional[float] = None):
+        self.model_name = model_name or settings.model_name
+        self.provider_name = (provider or settings.llm_provider or "ollama").lower()
+        # Per-instance temperature override (e.g. from the UI); else settings default.
+        self.temperature = temperature if temperature is not None else settings.temperature
+        self.provider = build_provider(self.provider_name, self.model_name)
+        print(f"🤖 Model Client ready: {self.model_name} (provider={self.provider_name})")
 
-    async def generate(self, messages: List[Dict[str, str]], stream: bool = True, json_mode: bool = False) -> Union[AsyncGenerator[str, None], str]:
-        """
-        Ollama Chat API'sini çağırır (Async).
-        
-        Args:
-            messages: [{"role": "user", "content": "..."}] formatında
-            stream: True ise AsyncGenerator döner, False ise string.
-            json_mode: True ise çıktı JSON'a zorlanır.
-        """
-        settings = cl.user_session.get("settings")
-        temp = settings.get("Temperature", 0.7) if settings else 0.7
-        options = {
-            "temperature": temp,
-            "num_ctx": 8192,
-            "keep_alive": -1    
+    def _build_options(self) -> Dict:
+        return {
+            "temperature": self.temperature,
+            "num_ctx": settings.num_ctx,
+            "keep_alive": -1,
         }
-        
-        format_param = "json" if json_mode else None
 
-        try:
-            if stream:
-                return self._stream_generator(messages, options, format_param)
-            else:
-                response = await self.client.chat(
-                    model=self.model_name,
-                    messages=messages,
-                    options=options,
-                    format=format_param,
-                    stream=False
-                )
-                return response['message']['content']
-                
-        except Exception as e:
-            # Ollama JSON parse hatası verirse (model JSON formatına uyamazsa)
-            # json_mode olmadan tekrar denemeyi veya hatayı yönetmeyi sağlar.
-            if "parsing" in str(e).lower() and json_mode:
-                print(f"⚠️ Ollama JSON Parse Hatası: {e}. Raw moda dönülüyor...")
-                # Fallback durumunda model_name'i açıkça belirt
-                response = await self.client.chat(
-                    model=self.model_name,
-                    messages=messages,
-                    options=options,
-                    stream=False
-                )
-                return response['message']['content']
-            
-            return f"Error communicating with Ollama: {str(e)}"
-
-    async def _stream_generator(self, messages, options, format_param) -> AsyncGenerator[str, None]:
-        stream = await self.client.chat(
-            model=self.model_name,
-            messages=messages,
-            options=options,
-            format=format_param,
-            stream=True
+    async def generate(
+        self,
+        messages: List[Dict[str, str]],
+        stream: bool = True,
+        json_mode: bool = False,
+        schema: Optional[Dict] = None,
+    ) -> Union[AsyncGenerator[str, None], str]:
+        options = self._build_options()
+        return await self.provider.generate(
+            messages, options=options, stream=stream, json_mode=json_mode, schema=schema
         )
-        
-        async for chunk in stream:
-            content = chunk['message']['content']
-            if content:
-                yield content
 
     async def check_connection(self) -> bool:
-        try:
-            await self.client.list()
-            return True
-        except:
-            return False
+        return await self.provider.check_connection()

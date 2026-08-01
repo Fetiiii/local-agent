@@ -72,10 +72,11 @@ If there are none, return empty lists.
         
         try:
             generator = await model.generate(
-                messages=[{"role": "system", "content": "You MUST output strict JSON only according to the schema requested."}, 
+                messages=[{"role": "system", "content": "You MUST output strict JSON only according to the schema requested."},
                           {"role": "user", "content": prompt + "\n\nFormat: {\"user_preferences\": [], \"project_facts\": [], \"correction_rules\": []}"}],
                 stream=False,
-                json_mode=True
+                json_mode=True,
+                schema=UserProfileExtraction.model_json_schema(),
             )
             
             from utils.helpers import extract_json

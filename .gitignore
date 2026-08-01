@@ -1,5 +1,7 @@
-__pyacache__
+__pycache__/
 __pypackages__/
+.venv/
 .chainlit/
 data/
 .env
+logs/*.log

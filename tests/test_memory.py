@@ -1,7 +1,12 @@
 import asyncio
 import os
+import sys
 import json
 from pathlib import Path
+
+# Ensure project root is importable when run directly (python tests/test_memory.py)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from utils.memory_manager import MemoryManager
 from backend.core.rag import RAGManager
 from backend.core.reflection_agent import ReflectionAgent
@@ -26,7 +31,7 @@ async def test_memory_pipeline():
     # We need a dummy ModelClient that returns a predictable JSON for Reflection
     # and a predictable string for Summarization, to avoid calling the real LLM in the test.
     class MockModelClient:
-        async def generate(self, messages, stream=False, json_mode=False):
+        async def generate(self, messages, stream=False, json_mode=False, schema=None):
             if json_mode:
                 return '{"user_preferences": ["Prefers Python 3.12", "Always use pytest"], "project_facts": ["Working on a chatbot app in C:\\projects\\chatbot"], "correction_rules": ["Never use print statements in production"]}'
             else:
@@ -61,7 +66,10 @@ async def test_memory_pipeline():
     for role, content in conversation:
          memory.add_message(role, content)
     
-    print("\n⏳ Forcing History Fetch (This will trigger _summarize_old_messages internally due to length)...")
+    print("\n⏳ Triggering background summarization (now an explicit, non-blocking step)...")
+    assert memory.needs_summarization(), "history should be long enough to summarize"
+    await memory._run_background_summarization()
+    # get_formatted_history is now fast/non-blocking — verify it still returns context
     await memory.get_formatted_history()
 
     # 3. Verify Short-Term Memory

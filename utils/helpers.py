@@ -3,6 +3,7 @@ import ollama
 from typing import Optional, Dict, Any, List
 from json_repair import repair_json
 from backend.core.schemas import AgentAction
+from backend.core.settings import settings
 
 async def get_ollama_models() -> List[str]:
     """Fetches all locally downloaded models from Ollama."""
@@ -49,7 +50,8 @@ def extract_json(response_str: str, schema_cls: Any = AgentAction) -> Optional[D
     Handles partial JSON, missing braces, and extra text.
     """
     try:
-        print(f"[LLM] {response_str[:120]}...")
+        if settings.debug:
+            print(f"[LLM] {response_str[:120]}...")
         # 1. Repair JSON (Handles missing brackets, trailing commas, etc.)
         # json_repair tries to find the JSON object within the text automatically.
         repaired_json_str = repair_json(response_str)
@@ -66,6 +68,14 @@ def extract_json(response_str: str, schema_cls: Any = AgentAction) -> Optional[D
             parsed_dict["tool_calls"] = [{"name": parsed_dict["tool_name"], "args": parsed_dict.get("tool_args", {})}]
             parsed_dict.pop("tool_name", None)
             parsed_dict.pop("tool_args", None)
+
+        # Weak models can emit a runaway tool_calls array (repetition loop). Cap it
+        # here so the schema's max_length doesn't reject the whole decision — the
+        # agent loop also dedupes. Keep in sync with AgentAction.tool_calls.max_length.
+        if schema_cls == AgentAction and isinstance(parsed_dict.get("tool_calls"), list):
+            if len(parsed_dict["tool_calls"]) > 8:
+                print(f"⚠️ Truncating runaway tool_calls: {len(parsed_dict['tool_calls'])} → 8")
+                parsed_dict["tool_calls"] = parsed_dict["tool_calls"][:8]
 
         # 3. Validate with Pydantic Schema
         if schema_cls == AgentAction:
