@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional
-import chainlit as cl
 
 PROFILE_PATH = Path("data/memory/user_profile.json")
 
@@ -53,10 +52,16 @@ class ReflectionAgent:
             
         return "\n".join(output)
 
-    async def extract_and_update(self, new_conversation_text: str):
+    async def extract_and_update(self, new_conversation_text: str, model=None):
         """Runs the Reflection logic to extract JSON schema facts and append them."""
         print("🧠 Reflection Agent: Extracting long-term semantic knowledge from summary...")
-        model = cl.user_session.get("model")
+        if model is None:
+            # Backward-compat: fall back to the Chainlit session model if present.
+            try:
+                import chainlit as cl
+                model = cl.user_session.get("model")
+            except Exception:
+                model = None
         if not model:
             print("⚠️ Reflection Agent: Model not found.")
             return

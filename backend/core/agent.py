@@ -22,6 +22,7 @@ from utils.helpers import extract_json
 from backend.core.model_client import ModelClient
 from backend.core.schemas import AgentAction
 from backend.core.agent_ui import AgentUI
+from backend.core import memory as mem
 from backend.tools import ToolRegistry
 
 AGENT_SCHEMA = AgentAction.model_json_schema()
@@ -81,8 +82,9 @@ async def _decide(model: ModelClient, messages: List[Dict]) -> Optional[Dict]:
 # ── Main loop ────────────────────────────────────────────────────────────────
 
 async def run_agent(query: str, ctx: AgentContext):
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    messages.extend(ctx.history[-20:])
+    system_content = mem.system_prompt_with_memory(SYSTEM_PROMPT, ctx.state.get("summary", ""))
+    messages = [{"role": "system", "content": system_content}]
+    messages.extend(ctx.history[-mem.MAX_RECENT:])
 
     # Retrieve relevant document/memory context (RAG) + any uploaded-file hint.
     context_str = ""
@@ -121,6 +123,8 @@ async def run_agent(query: str, ctx: AgentContext):
         await ctx.ui.final(answer)
         ctx.history.append({"role": "user", "content": query})
         ctx.history.append({"role": "assistant", "content": answer})
+        # Background (non-blocking) summarization once the buffer overflows.
+        asyncio.create_task(mem.summarize_if_needed(ctx))
         return
 
     await ctx.ui.notice("Maksimum adım sayısına ulaşıldı.", "warn")
