@@ -24,6 +24,17 @@
   header .dot.on{background:var(--ok)}
   select{background:var(--panel2);color:var(--text);border:1px solid var(--border);
     border-radius:8px;padding:6px 10px;font-size:13px}
+  #layout{flex:1;display:flex;overflow:hidden}
+  #sidebar{width:250px;flex-shrink:0;border-right:1px solid var(--border);background:var(--panel);
+    display:flex;flex-direction:column;overflow-y:auto;padding:10px}
+  #newchat{background:var(--accent2);color:#fff;margin-bottom:10px}
+  #convs .conv{padding:9px 11px;border-radius:8px;cursor:pointer;font-size:13.5px;color:var(--muted);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;gap:6px;align-items:center}
+  #convs .conv:hover{background:var(--panel2);color:var(--text)}
+  #convs .conv.active{background:var(--user);color:var(--text)}
+  #convs .conv .del{margin-left:auto;opacity:0;color:var(--err)}
+  #convs .conv:hover .del{opacity:.7}
+  #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
   #log{flex:1;overflow-y:auto;padding:20px;max-width:900px;width:100%;margin:0 auto}
   .msg{margin:14px 0;display:flex;flex-direction:column;gap:6px}
   .bubble{padding:10px 14px;border-radius:12px;white-space:pre-wrap;word-wrap:break-word}
@@ -64,6 +75,12 @@
     <span style="flex:1"></span>
     <span class="notice info" id="provider"></span>
   </header>
+  <div id="layout">
+    <aside id="sidebar">
+      <button id="newchat">＋ Yeni sohbet</button>
+      <div id="convs"></div>
+    </aside>
+    <main id="main">
   <div id="log"></div>
   <footer>
     <input type="file" id="file" style="display:none">
@@ -71,6 +88,8 @@
     <textarea id="input" rows="1" placeholder="Mesaj yaz… (Enter gönder, Shift+Enter yeni satır)"></textarea>
     <button id="send">Gönder</button>
   </footer>
+    </main>
+  </div>
 
 <script>
 const log = document.getElementById('log');
@@ -79,7 +98,7 @@ const sendBtn = document.getElementById('send');
 const modelSel = document.getElementById('model');
 const statusDot = document.getElementById('status');
 const providerEl = document.getElementById('provider');
-let ws, curAssistant = null, busy = false, sessionId = null;
+let ws, curAssistant = null, busy = false, sessionId = null, threadId = null;
 
 function el(cls, html){const d=document.createElement('div'); if(cls)d.className=cls; if(html!=null)d.innerHTML=html; return d;}
 function scroll(){log.scrollTop = log.scrollHeight;}
@@ -116,7 +135,16 @@ function connect(){
 
 function handle(m){
   switch(m.type){
-    case 'session': sessionId = m.id; break;
+    case 'session': sessionId = m.id; threadId = m.thread_id; break;
+    case 'thread': threadId = m.id; markActive(); break;
+    case 'history':{
+      threadId = m.thread_id; log.innerHTML=''; curAssistant=null;
+      (m.messages||[]).forEach(msg=>{
+        if(msg.role==='user') addUser(msg.content);
+        else{const a=el('msg assistant');a.appendChild(el('role','Agent'));a.appendChild(el('bubble',esc(msg.content)));log.appendChild(a);}
+      });
+      markActive(); scroll(); break;
+    }
     case 'step':{
       let h=''; if(m.thought) h+=`💭 ${esc(m.thought)}`;
       if(m.plan&&m.plan.length) h+=`<div class="plan">📋 ${m.plan.map(esc).join('<br>• ').replace(/^/,'• ')}</div>`;
@@ -141,7 +169,7 @@ function handle(m){
       log.appendChild(el('notice '+(m.level||'info'), esc(m.text))); scroll(); break;
     }
     case 'approval_request': renderApproval(m); break;
-    case 'done': setBusy(false); curAssistant=null; break;
+    case 'done': setBusy(false); curAssistant=null; loadConvs(); break;
   }
 }
 
@@ -163,6 +191,28 @@ function renderApproval(m){
   no.onclick=()=>{ws.send(JSON.stringify({type:'approval_response',id:m.id,approved:false}));c.remove();};
   b.appendChild(ok);b.appendChild(no);c.appendChild(b);log.appendChild(c);scroll();
 }
+
+// Conversations sidebar
+const convsEl=document.getElementById('convs');
+function markActive(){document.querySelectorAll('#convs .conv').forEach(c=>c.classList.toggle('active',c.dataset.id===threadId));}
+async function loadConvs(){
+  try{
+    const r=await fetch('/api/conversations'); const list=await r.json();
+    convsEl.innerHTML='';
+    list.forEach(c=>{
+      const d=el('conv'); d.dataset.id=c.id;
+      d.innerHTML=`<span>💬 ${esc(c.title)}</span><span class="del" title="Sil">🗑</span>`;
+      d.querySelector('span').onclick=()=>{ if(busy)return; ws.send(JSON.stringify({type:'resume',id:c.id})); };
+      d.querySelector('.del').onclick=async(e)=>{e.stopPropagation(); await fetch('/api/conversations/'+c.id,{method:'DELETE'}); loadConvs();};
+      convsEl.appendChild(d);
+    });
+    markActive();
+  }catch(e){}
+}
+document.getElementById('newchat').onclick=()=>{
+  if(busy)return;
+  ws.send(JSON.stringify({type:'new'})); log.innerHTML=''; curAssistant=null; markActive();
+};
 
 function setBusy(b){busy=b;sendBtn.disabled=b;}
 function send(){
@@ -191,7 +241,7 @@ fileInput.onchange=async()=>{
 input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
 input.addEventListener('input',()=>{input.style.height='auto';input.style.height=Math.min(input.scrollHeight,160)+'px';});
 
-loadModels(); connect();
+loadModels(); loadConvs(); connect();
 </script>
 </body>
 </html>

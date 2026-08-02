@@ -42,6 +42,7 @@ class AgentContext:
     model: ModelClient
     registry: ToolRegistry
     rag: Any = None                                      # RAGManager (optional)
+    thread_id: Optional[str] = None                      # persisted conversation id
     history: List[Dict] = field(default_factory=list)    # conversation memory
     state: Dict[str, Any] = field(default_factory=dict)  # session store
 

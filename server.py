@@ -26,6 +26,7 @@ from backend.core.agent_ui import AgentUI
 from backend.core.agent import AgentContext, run_agent
 from backend.core.model_client import ModelClient
 from backend.core.rag import get_rag_manager
+from backend.core import conversations as convs
 from backend.ingestion.ingestor import UniversalIngestor
 from backend.tools import ToolRegistry
 from backend.tools.data_analyst import DataAnalystTool
@@ -128,6 +129,17 @@ async def list_models():
         return {"provider": provider, "models": [], "error": str(e)}
 
 
+@app.get("/api/conversations")
+async def list_conversations():
+    return await asyncio.to_thread(convs.list_all)
+
+
+@app.delete("/api/conversations/{tid}")
+async def delete_conversation(tid: str):
+    ok = await asyncio.to_thread(convs.delete, tid)
+    return {"ok": ok}
+
+
 @app.post("/api/upload")
 async def upload(session_id: str = Form(...), file: UploadFile = File(...)):
     ctx = SESSIONS.get(session_id)
@@ -163,15 +175,17 @@ async def ws_endpoint(ws: WebSocket):
     await ws.accept()
     ui = WebSocketUI(ws)
     ctx = AgentContext(ui=ui, model=ModelClient(), registry=build_registry(),
-                       rag=get_rag_manager())
+                       rag=get_rag_manager(), thread_id=convs.new_id())
     sid = uuid.uuid4().hex
     SESSIONS[sid] = ctx
-    await ui._send({"type": "session", "id": sid})
+    await ui._send({"type": "session", "id": sid, "thread_id": ctx.thread_id})
     current: asyncio.Task | None = None
 
     async def _run(text: str):
         try:
             await run_agent(text, ctx)
+            await asyncio.to_thread(convs.save, ctx.thread_id, ctx.history,
+                                    ctx.state.get("summary", ""))
         except Exception as e:
             await ui.notice(f"Agent error: {e}", "error")
         finally:
@@ -187,6 +201,19 @@ async def ws_endpoint(ws: WebSocket):
                 current = asyncio.create_task(_run(msg.get("content", "")))
             elif mtype == "approval_response":
                 ui.resolve_approval(msg.get("id"), bool(msg.get("approved")))
+            elif mtype == "resume":
+                data = await asyncio.to_thread(convs.load, msg.get("id"))
+                if data:
+                    ctx.history = data.get("messages", [])
+                    ctx.state["summary"] = data.get("summary", "")
+                    ctx.thread_id = data["id"]
+                    await ui._send({"type": "history", "thread_id": ctx.thread_id,
+                                    "messages": ctx.history})
+            elif mtype == "new":
+                ctx.history = []
+                ctx.state = {}
+                ctx.thread_id = convs.new_id()
+                await ui._send({"type": "thread", "id": ctx.thread_id})
     except WebSocketDisconnect:
         if current and not current.done():
             current.cancel()
