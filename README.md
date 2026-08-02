@@ -57,6 +57,18 @@ PDF · DOCX · XLSX · XLS · CSV  (legacy `.doc` — convert to `.docx` first)
 
 ---
 
+## Quick Start
+
+```bash
+git clone https://github.com/Fetiiii/lokal-agent
+cd lokal-agent
+./setup.sh          # venv + deps + sandbox image + .env
+# edit .env (MODEL_NAME, LLM_PROVIDER), then start your model backend, then:
+./run.sh            # → http://localhost:8000
+```
+
+The manual steps are below if you prefer.
+
 ## Installation
 
 ```bash
