@@ -5,3 +5,4 @@ __pypackages__/
 data/
 .env
 logs/*.log
+frontend/vendor/

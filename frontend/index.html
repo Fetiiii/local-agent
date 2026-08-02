@@ -66,6 +66,7 @@
   #send{background:var(--accent2);color:#fff}
   #send:disabled{opacity:.5;cursor:not-allowed}
 </style>
+<script src="/static/vendor/plotly.min.js"></script>
 </head>
 <body>
   <header>
@@ -160,7 +161,8 @@ function handle(m){
       const d=document.getElementById('tool-'+m.id); if(!d)break;
       d.className='tool done';
       d.innerHTML+=`<pre>${esc(m.result)}</pre>`;
-      (m.artifacts||[]).forEach(a=>d.appendChild(renderArtifact(a)));
+      // Artifacts render at log level (visible, and in-DOM so Plotly sizes correctly).
+      (m.artifacts||[]).forEach(a=>log.appendChild(renderArtifact(a)));
       scroll(); break;
     }
     case 'token': ensureAssistant().textContent += m.text; scroll(); break;
@@ -177,7 +179,15 @@ function renderArtifact(a){
   if(a.type==='image'){const i=document.createElement('img');i.className='artifact';i.src=a.data;return i;}
   if(a.type==='table'){const w=el('table-wrap',a.html);return w;}
   if(a.type==='links'){return el('', a.items.map(x=>`<div>🔗 <a href="${x.link}" target="_blank">${esc(x.title||x.link)}</a></div>`).join(''));}
-  if(a.type==='plotly'){return el('notice info','📊 interaktif grafik (plotly) — görüntüleyici yakında');}
+  if(a.type==='plotly'){
+    const d=document.createElement('div'); d.style.cssText='margin-top:8px;min-height:340px';
+    setTimeout(()=>{
+      try{ const fig=JSON.parse(a.json);
+        (window.Plotly? Plotly.newPlot(d, fig.data||[], fig.layout||{}, {responsive:true}) : d.textContent='(plotly.js yüklenemedi)');
+      }catch(e){ d.textContent='(grafik yüklenemedi)'; }
+    },0);
+    return d;
+  }
   if(a.type==='text'){return el('',`<pre>${esc(a.text)}</pre>`);}
   return el('notice info','📎 '+esc(a.type));
 }

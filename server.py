@@ -20,6 +20,7 @@ load_dotenv()
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.core.settings import settings
 from backend.core.agent_ui import AgentUI
@@ -43,6 +44,24 @@ UPLOAD_DIR = Path(__file__).parent / "data" / "temp" / "uploads"
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
 app = FastAPI(title="Local Agent")
+
+
+def _ensure_plotly_js():
+    """Write the plotly.js bundled with the installed plotly package (offline, version-matched)."""
+    target = FRONTEND_DIR / "vendor" / "plotly.min.js"
+    if target.exists():
+        return
+    try:
+        import plotly.offline
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(plotly.offline.get_plotlyjs(), encoding="utf-8")
+        print("📊 plotly.js frontend/vendor/ altına yazıldı.")
+    except Exception as e:
+        print(f"⚠️ plotly.js üretilemedi: {e}")
+
+
+_ensure_plotly_js()
+app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
 # Live WebSocket sessions, so HTTP uploads can attach to the right conversation.
 SESSIONS: dict[str, "AgentContext"] = {}
