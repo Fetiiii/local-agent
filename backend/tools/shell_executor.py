@@ -72,12 +72,49 @@ class ShellExecutorTool:
             },
         }
 
+    async def _run_host(self, command: str, cwd: str, timeout: int) -> str:
+        """Run on the host with full access and an unrestricted working directory."""
+        from pathlib import Path as _P
+        try:
+            resolved_cwd = _P(cwd).expanduser() if cwd else _P.home()
+            if not resolved_cwd.is_dir():
+                resolved_cwd = _P.home()
+        except Exception:
+            resolved_cwd = _P.home()
+        try:
+            process = await asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                cwd=str(resolved_cwd),
+            )
+            try:
+                raw, _ = await asyncio.wait_for(process.communicate(), timeout=timeout)
+            except asyncio.TimeoutError:
+                process.kill()
+                return f"⏰ Command timed out after {timeout}s and was killed.\nCommand: {command}"
+            output = raw.decode("utf-8", errors="replace")
+            if len(output.encode()) > MAX_OUTPUT_BYTES:
+                output = output[: MAX_OUTPUT_BYTES // 2] + "\n… [output truncated] …"
+            code = process.returncode
+            status = "✅" if code == 0 else f"⚠️ (exit code {code})"
+            return f"{status} [🖥️ host] CWD: {resolved_cwd}\n\n```\n{output.strip()}\n```"
+        except FileNotFoundError:
+            return f"❌ Command not found: '{command.split()[0]}'."
+        except Exception as e:
+            return f"❌ Host execution error: {e}"
+
     async def run(self, command: str, cwd: str = None, timeout: int = TIMEOUT_SECONDS) -> str:
         # --- Safety: blocklist (defense-in-depth; primary isolation is the sandbox) ---
         cmd_lower = command.strip().lower()
         for blocked in BLOCKED_PREFIXES:
             if cmd_lower.startswith(blocked):
                 return f"❌ Blocked command: '{command}' matches blocklist pattern '{blocked}'."
+
+        # --- Host mode: full-machine access (each command is HITL-approved in the
+        #     agent core before we get here). Not sandboxed — for real user tasks. ---
+        if settings.shell_host:
+            return await self._run_host(command, cwd, timeout)
 
         # --- Sandbox path: run inside an isolated Docker container when enabled ---
         backend = settings.sandbox_backend.lower()

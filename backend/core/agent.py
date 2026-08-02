@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import config
+from backend.core.settings import settings
 from prompts import SYSTEM_PROMPT
 from utils.helpers import extract_json
 from backend.core.model_client import ModelClient
@@ -198,6 +199,13 @@ async def _exec_tool(name: str, args: Dict, ctx: AgentContext):
         approved = await _approve_file_edit(name, kw, ctx.ui)
         if not approved:
             return ("❌ User rejected the change.", [])
+
+    # HITL approval for host-mode shell commands (full-machine access).
+    if name == "shell_executor" and settings.shell_host:
+        detail = (f"**Host terminalinde çalıştırılacak:**\n```\n{kw.get('command', '')}\n```\n"
+                  f"CWD: {kw.get('cwd') or '~'}")
+        if not await ctx.ui.ask_approval("Terminal (host) komut onayı", detail):
+            return ("❌ User rejected the command.", [])
 
     try:
         if asyncio.iscoroutinefunction(tool.run):

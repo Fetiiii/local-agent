@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     sandbox_memory: str = Field("2g", env="SANDBOX_MEMORY")
     sandbox_cpus: str = Field("2", env="SANDBOX_CPUS")
     sandbox_pids_limit: int = Field(256, env="SANDBOX_PIDS_LIMIT")
+    # Let shell_executor run on the HOST (full machine access, e.g. moving files
+    # anywhere) instead of the sandbox. Every host command requires HITL approval.
+    # data_analyst stays sandboxed regardless.
+    shell_host: bool = Field(False, env="SHELL_HOST")
 
     # ── File-Editing Subsystem ────────────────────────────────────────────────
     # Root directory that the file-editing tools are allowed to read/write.
