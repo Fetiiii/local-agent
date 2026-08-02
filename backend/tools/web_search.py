@@ -98,11 +98,15 @@ class WebSearchTool:
             for i, r in enumerate(limited, 1):
                 summary_lines.append(f"{i}. {r['title']} - {r['snippet']}")
             
-            summary_text = f"Found {len(limited)} results for '{q}':\n" + "\n".join(summary_lines)
+            summary_text = (
+                f"Found {len(limited)} results for '{q}':\n" + "\n".join(summary_lines)
+                + "\n\n(These are search snippets only. For an accurate answer, call "
+                  "web_scraper on the most relevant URL(s) to read the full content.)"
+            )
 
             return {
                 "text": summary_text,
-                "artifacts": limited # Helper will render this as Markdown list
+                "artifacts": limited # rendered as a links block
             }
 
         except Exception as e:

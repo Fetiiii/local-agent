@@ -254,7 +254,13 @@ async def _approve_file_edit(name: str, kw: Dict, ui: AgentUI) -> bool:
 def _serialize_artifacts(items: List[Any]) -> List[Dict]:
     """Turn tool artifacts into JSON-serializable descriptors for the frontend."""
     out = []
+    # web_search returns a flat list of {title, link, snippet} dicts → one links block.
+    link_items = [i for i in items if isinstance(i, dict) and i.get("link")]
+    if link_items:
+        out.append({"type": "links", "items": link_items})
     for item in items:
+        if isinstance(item, dict):
+            continue  # link dicts handled above
         try:
             # Plotly figure
             if item.__class__.__name__ == "Figure" and hasattr(item, "to_json"):
