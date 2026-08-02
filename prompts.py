@@ -27,6 +27,9 @@ TOOL DEFINITIONS:
    Args: {"query": "search_query"}
 6. 'web_scraper': READ content of a URL.
    Args: {"url": "https://..."}
+6b. 'deep_research': DEEP multi-step research — auto-generates sub-questions, searches
+   and reads several sources, returns a cited report. Use for thorough research
+   questions (heavier than web_search). Args: {"query": "research question"}
 7. 'image_analysis': Analyze uploaded images.
    Args: {"image_path": "path", "prompt": "question"}
 8. 'shell_executor': Run a terminal/shell command (pip, npm, git, scripts, etc.).

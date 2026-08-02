@@ -33,6 +33,7 @@ from backend.tools import ToolRegistry
 from backend.tools.data_analyst import DataAnalystTool
 from backend.tools.web_search import WebSearchTool
 from backend.tools.web_scraper import WebScraperTool
+from backend.tools.deep_research import DeepResearchTool
 from backend.tools.shell_executor import ShellExecutorTool
 from backend.tools.image_analysis import ImageAnalysisTool
 from backend.tools.file_editing.file_reader import FileReaderTool
@@ -70,8 +71,8 @@ _ingestor = UniversalIngestor()
 
 def build_registry() -> ToolRegistry:
     reg = ToolRegistry()
-    for t in (DataAnalystTool(), WebSearchTool(), WebScraperTool(), ShellExecutorTool(),
-              ImageAnalysisTool(model_name=settings.vision_model),
+    for t in (DataAnalystTool(), WebSearchTool(), WebScraperTool(), DeepResearchTool(),
+              ShellExecutorTool(), ImageAnalysisTool(model_name=settings.vision_model),
               FileReaderTool(), FileArchitectTool(), FileSurgeonTool()):
         reg.register(t)
     return reg
@@ -217,7 +218,11 @@ async def ws_endpoint(ws: WebSocket):
             if mtype == "user_message":
                 if msg.get("model") and msg["model"] != ctx.model.model_name:
                     ctx.model = ModelClient(model_name=msg["model"])
-                current = asyncio.create_task(_run(msg.get("content", "")))
+                content = msg.get("content", "")
+                if msg.get("deep_research"):
+                    content = ("[DeepSearch modu] Bu soruyu 'deep_research' tool'unu "
+                               "kullanarak derinlemesine araştır:\n" + content)
+                current = asyncio.create_task(_run(content))
             elif mtype == "approval_response":
                 ui.resolve_approval(msg.get("id"), bool(msg.get("approved")))
             elif mtype == "resume":
