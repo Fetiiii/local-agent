@@ -55,15 +55,8 @@ class ReflectionAgent:
     async def extract_and_update(self, new_conversation_text: str, model=None):
         """Runs the Reflection logic to extract JSON schema facts and append them."""
         print("🧠 Reflection Agent: Extracting long-term semantic knowledge from summary...")
-        if model is None:
-            # Backward-compat: fall back to the Chainlit session model if present.
-            try:
-                import chainlit as cl
-                model = cl.user_session.get("model")
-            except Exception:
-                model = None
         if not model:
-            print("⚠️ Reflection Agent: Model not found.")
+            print("⚠️ Reflection Agent: Model not provided.")
             return
 
         prompt = f"""You are a Semantic Extraction Agent. Your job is to extract long-term facts about the user and their projects from a recent conversation.

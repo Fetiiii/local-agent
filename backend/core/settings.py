@@ -5,7 +5,6 @@ from typing import Optional
 class Settings(BaseSettings):
     # Core Application Settings
     model_name: str = Field("", env="MODEL_NAME")
-    chainlit_database_url: Optional[str] = Field(None, env="CHAINLIT_DATABASE_URL")
 
     # ── Vision (image_analysis) — may use a different backend than the main LLM ─
     # Provider serving the vision model. Empty → follow llm_provider.

@@ -177,7 +177,7 @@ async def _exec_tool(name: str, args: Dict, ctx: AgentContext):
     if not tool:
         return (f"❌ Tool '{name}' not found.", [])
 
-    # Argument shaping (mirrors the old tool_manager special-cases).
+    # Argument shaping for tools that need it.
     if name == "web_search":
         kw = {"query": args.get("query", "")}
     elif name == "data_analyst":

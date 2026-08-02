@@ -1,14 +1,13 @@
 # Lokal Agent
 
-A fully local AI agent system powered by [Ollama](https://ollama.com) and [Chainlit](https://chainlit.io). Run large language models (20B, 30B, 80B+) on your own hardware with a rich tool ecosystem, multi-tier memory, RAG, and an optional multi-agent mode — no cloud required.
+A fully local AI agent system powered by [Ollama](https://ollama.com) or [llama.cpp](https://github.com/ggml-org/llama.cpp), with a custom FastAPI + WebSocket UI. Run open-weight LLMs (8B–200B+) on your own hardware with a rich tool ecosystem, multi-tier memory, RAG, a Docker-isolated code sandbox, and vision — no cloud required.
 
 ## Features
 
 ### Agent & Reasoning
 - **ReAct-style agent loop** — think → plan → call tools → observe → repeat
-- **Parallel tool calling** — multiple tools execute concurrently in a single step
-- **Multi-agent mode** — a Supervisor routes tasks to a CoderAgent or ResearcherAgent (toggle in UI)
-- **JSON repair** — handles malformed JSON output from quantized models automatically
+- **Parallel tool calling** — multiple independent tools run concurrently (deduped & capped)
+- **Structured outputs** — a JSON schema constrains the model's output (with JSON-repair fallback), so even small models drive tools reliably
 
 ### Memory (3 Tiers)
 | Tier | Mechanism | Scope |
@@ -38,11 +37,11 @@ PDF · DOCX · XLSX · XLS · CSV  (legacy `.doc` — convert to `.docx` first)
 | `web_scraper` | Extract readable content from a URL |
 | `image_analysis` | Analyze images with a local vision model |
 
-### UI
-- Streaming responses with step-by-step thought visibility
-- Chat settings panel: model selector, temperature slider, multi-agent toggle
-- Sidebar conversation history with resume support
-- Dynamically lists all locally available Ollama models at startup
+### UI (custom FastAPI + WebSocket, vanilla JS — no build step)
+- Streaming responses with collapsible thought/plan and tool steps
+- Model selector (auto-listed from the provider), file upload → RAG
+- Inline artifacts: plots, tables, links; human-in-the-loop approval for file edits
+- Sidebar conversation history with resume (persisted as JSON)
 
 ---
 
@@ -112,8 +111,7 @@ TEMPERATURE=0.7
 # Optional: vision model for image analysis
 VISION_MODEL=qwen3-vl:2b
 
-# Optional: persist conversation history across restarts (SQLite example)
-# CHAINLIT_DATABASE_URL=sqlite+aiosqlite:///./data/chainlit.db
+# Conversations are auto-persisted as JSON under data/conversations/ (no DB needed).
 
 # Optional: Brave Search API key for the web_search tool
 # https://brave.com/search/api/
@@ -194,28 +192,17 @@ instead of failing silently.
 
 ## Running
 
-First generate the auth secret required by Chainlit's login (once):
+Make sure your model backend is running (Ollama, or a llama.cpp `llama-server`
+— see [Configuration](#configuration)), then start the web server:
 
 ```bash
-chainlit create-secret
-# copy the printed CHAINLIT_AUTH_SECRET=... line into your .env
-```
-
-(Optional) Enable sidebar history & resuming past chats by creating the
-persistence tables once, then setting `CHAINLIT_DATABASE_URL` in `.env`:
-
-```bash
-mkdir -p data/temp
-sqlite3 data/temp/chainlit.db < backend/database/chainlit_schema.sql
-```
-
-Then start the app:
-
-```bash
-chainlit run app.py
+.venv/bin/uvicorn server:app --host 127.0.0.1 --port 8000
 ```
 
 Then open [http://localhost:8000](http://localhost:8000) in your browser.
+
+Conversations are persisted as JSON files under `data/conversations/` and appear
+in the sidebar; click one to resume it.
 
 ---
 
@@ -223,52 +210,41 @@ Then open [http://localhost:8000](http://localhost:8000) in your browser.
 
 ```
 lokal-agent/
-├── app.py                      # Chainlit entry point, session wiring
-├── prompts.py                  # System prompts for all agent roles
+├── server.py                   # FastAPI + WebSocket entry point
+├── frontend/index.html         # Vanilla JS chat UI (no build step)
+├── prompts.py                  # System prompts for the agent
 ├── config.py                   # Thin proxy over backend.core.settings
+├── docker/sandbox.Dockerfile   # Image for the code-execution sandbox
 │
 ├── backend/
 │   ├── core/
-│   │   ├── model_client.py     # Async Ollama wrapper (streaming + JSON mode)
+│   │   ├── agent.py            # Headless agent loop (run_agent)
+│   │   ├── agent_ui.py         # Transport-agnostic event interface
+│   │   ├── memory.py           # 3-tier memory (summary + episodic + profile)
+│   │   ├── conversations.py    # JSON conversation persistence
+│   │   ├── model_client.py     # Provider facade (streaming + structured output)
+│   │   ├── providers/          # Ollama + OpenAI-compatible backends
 │   │   ├── rag.py              # ChromaDB RAG + episodic memory
 │   │   ├── reflection_agent.py # Long-term user profile extractor
 │   │   ├── schemas.py          # Pydantic schemas for agent actions
 │   │   └── settings.py         # Pydantic Settings (.env loader)
 │   │
-│   ├── ingestion/
-│   │   ├── ingestor.py         # Format router (PDF / DOCX / Excel)
-│   │   └── parsers/            # PDF, DOCX, Excel parsers
+│   ├── ingestion/              # docling/markitdown → Markdown (lazy-loaded)
 │   │
-│   ├── tools/
-│   │   ├── data_analyst.py
-│   │   ├── web_search.py
-│   │   ├── web_scraper.py
-│   │   ├── file_writer.py
-│   │   ├── image_analysis.py
-│   │   ├── project_scaffolder.py
-│   │   ├── shell_executor.py
-│   │   └── file_editing/       # file_reader, file_architect, file_surgeon
-│   │
-│   └── database/
-│       └── db.py
+│   └── tools/
+│       ├── data_analyst.py     # Persistent Python kernel (sandboxed)
+│       ├── web_search.py · web_scraper.py · image_analysis.py · shell_executor.py
+│       ├── sandbox/            # Docker isolation (shell + data_analyst)
+│       └── file_editing/       # file_reader, file_architect, file_surgeon (+ HITL, backup)
 │
-├── utils/
-│   ├── agent_engine.py         # Main agent loop + multi-agent supervisor
-│   ├── memory_manager.py       # Short/mid-term memory + summarization
-│   ├── tool_manager.py         # Tool dispatch
-│   ├── ingestion_handler.py    # File upload handling
-│   └── helpers.py              # JSON extraction/repair, Ollama model listing
-│
-├── tests/
-│   ├── test_all.py
-│   ├── test_memory.py
-│   ├── test_researcher.py
-│   └── test_file_editing.py
+├── utils/helpers.py            # JSON extraction/repair, model listing
+├── tests/                      # test_all, test_researcher, test_file_editing
 │
 └── data/
     ├── vector_store/           # ChromaDB persistent store
     ├── memory/                 # user_profile.json (long-term memory)
-    ├── exports/                # Working directory for file tools
+    ├── conversations/          # Saved chats (JSON, one per conversation)
+    ├── exports/                # Working dir for file tools (mounted into sandbox)
     └── temp/                   # Upload cache & backups
 ```
 
@@ -276,7 +252,7 @@ lokal-agent/
 
 ## Model Recommendations
 
-This project is designed for larger local models. Smaller models (7B) often struggle with the strict JSON output format required by the agent loop.
+This project targets open-weight local models. Structured outputs + JSON-repair let even small models (tested down to 4B) drive the tools reliably; larger models mainly improve reasoning quality.
 
 | Size | Recommendation |
 |------|----------------|

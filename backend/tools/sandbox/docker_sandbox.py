@@ -29,14 +29,7 @@ _MAX_OUTPUT_BYTES = 8192
 
 
 def current_session_id() -> str:
-    """Best-effort Chainlit session id; falls back to a shared id off-session."""
-    try:
-        import chainlit as cl
-        sid = cl.context.session.id
-        if sid:
-            return str(sid)
-    except Exception:
-        pass
+    """Sandbox session key. Single shared session for now (single-user UI)."""
     return "default"
 
 
