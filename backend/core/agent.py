@@ -40,7 +40,8 @@ class AgentContext:
     ui: AgentUI
     model: ModelClient
     registry: ToolRegistry
-    history: List[Dict] = field(default_factory=list)   # conversation memory
+    rag: Any = None                                      # RAGManager (optional)
+    history: List[Dict] = field(default_factory=list)    # conversation memory
     state: Dict[str, Any] = field(default_factory=dict)  # session store
 
 
@@ -82,7 +83,19 @@ async def _decide(model: ModelClient, messages: List[Dict]) -> Optional[Dict]:
 async def run_agent(query: str, ctx: AgentContext):
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages.extend(ctx.history[-20:])
-    messages.append({"role": "user", "content": f"User Query: {query}"})
+
+    # Retrieve relevant document/memory context (RAG) + any uploaded-file hint.
+    context_str = ""
+    if ctx.rag is not None:
+        try:
+            chunks = await asyncio.to_thread(ctx.rag.search, query, 3)
+            context_str = "\n---\n".join(chunks)
+        except Exception as e:
+            print(f"RAG search error: {e}")
+    user_content = f"User Query: {query}{ctx.state.get('file_hint', '')}"
+    if context_str:
+        user_content += f"\n\nContext from Files (RAG):\n{context_str}"
+    messages.append({"role": "user", "content": user_content})
 
     for _ in range(config.MAX_STEPS):
         decision = await _decide(ctx.model, messages)

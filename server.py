@@ -18,14 +18,15 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 
 from backend.core.settings import settings
 from backend.core.agent_ui import AgentUI
 from backend.core.agent import AgentContext, run_agent
 from backend.core.model_client import ModelClient
+from backend.core.rag import get_rag_manager
+from backend.ingestion.ingestor import UniversalIngestor
 from backend.tools import ToolRegistry
 from backend.tools.data_analyst import DataAnalystTool
 from backend.tools.web_search import WebSearchTool
@@ -37,8 +38,14 @@ from backend.tools.file_editing.file_architect import FileArchitectTool
 from backend.tools.file_editing.file_surgeon import FileSurgeonTool
 
 FRONTEND_DIR = Path(__file__).parent / "frontend"
+UPLOAD_DIR = Path(__file__).parent / "data" / "temp" / "uploads"
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
 app = FastAPI(title="Local Agent")
+
+# Live WebSocket sessions, so HTTP uploads can attach to the right conversation.
+SESSIONS: dict[str, "AgentContext"] = {}
+_ingestor = UniversalIngestor()
 
 
 def build_registry() -> ToolRegistry:
@@ -121,11 +128,45 @@ async def list_models():
         return {"provider": provider, "models": [], "error": str(e)}
 
 
+@app.post("/api/upload")
+async def upload(session_id: str = Form(...), file: UploadFile = File(...)):
+    ctx = SESSIONS.get(session_id)
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    dest = UPLOAD_DIR / os.path.basename(file.filename)
+    dest.write_bytes(await file.read())
+    ext = dest.suffix.lower()
+
+    if ext in IMAGE_EXTS:
+        if ctx is not None:
+            ctx.state["last_image_path"] = str(dest)
+            ctx.state["file_hint"] = (
+                f"\n[SYSTEM HINT]: An image was uploaded at '{dest}'. "
+                "Use 'image_analysis' to inspect it.")
+        return {"ok": True, "type": "image", "name": dest.name}
+
+    # Document → ingest to Markdown → index in RAG.
+    try:
+        md = await asyncio.to_thread(_ingestor.ingest_file, str(dest))
+        if not md:
+            return {"ok": False, "name": dest.name, "error": "Desteklenmeyen/okunamayan dosya."}
+        chunks = await asyncio.to_thread(get_rag_manager().add_document, md, dest.name)
+        if ctx is not None:
+            ctx.state["file_hint"] = (
+                f"\n[SYSTEM HINT]: Uploaded file '{dest.name}' is indexed and searchable.")
+        return {"ok": True, "type": "doc", "name": dest.name, "chunks": chunks}
+    except Exception as e:
+        return {"ok": False, "name": dest.name, "error": str(e)}
+
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
     ui = WebSocketUI(ws)
-    ctx = AgentContext(ui=ui, model=ModelClient(), registry=build_registry())
+    ctx = AgentContext(ui=ui, model=ModelClient(), registry=build_registry(),
+                       rag=get_rag_manager())
+    sid = uuid.uuid4().hex
+    SESSIONS[sid] = ctx
+    await ui._send({"type": "session", "id": sid})
     current: asyncio.Task | None = None
 
     async def _run(text: str):
@@ -149,3 +190,5 @@ async def ws_endpoint(ws: WebSocket):
     except WebSocketDisconnect:
         if current and not current.done():
             current.cancel()
+    finally:
+        SESSIONS.pop(sid, None)
