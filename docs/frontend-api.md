@@ -30,7 +30,8 @@ Run the backend: `.venv/bin/uvicorn server:app --host 127.0.0.1 --port 8000`
 
 ```jsonc
 { "type": "user_message", "content": "...", "model": "<optional model id>",
-  "deep_research": false }   // deep_research=true routes the turn through DeepSearch
+  "deep_research": false,    // deep_research=true routes the turn through DeepSearch (🔎)
+  "orchestrate": false }     // orchestrate=true lets the manager delegate to sub-agents (🤝)
 { "type": "approval_response", "id": "<approval id>", "approved": true }
 { "type": "resume", "id": "<thread_id>" }   // load a saved conversation
 { "type": "new" }                            // start a fresh conversation
