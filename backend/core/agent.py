@@ -255,10 +255,23 @@ async def _decide(model: ModelClient, messages: List[Dict], ui: AgentUI):
 
 # ── Main loop ────────────────────────────────────────────────────────────────
 
+def _shell_hint() -> str:
+    """A mode-accurate note about shell_executor's working directory, so the
+    model doesn't guess (e.g. '/workspace') and waste a step on a refused path."""
+    if settings.shell_host:
+        return ("\n\nSHELL NOTE: shell_executor runs on the HOST with full access "
+                "(each command is user-approved). 'cwd' may be any path; it defaults to your home.")
+    return ("\n\nSHELL NOTE: shell_executor runs in a RESTRICTED working area (data/exports). "
+            "Pass 'cwd' as a relative sub-folder name or omit it — NEVER an absolute path "
+            "like /workspace, or the command is refused.")
+
+
 async def run_agent(query: str, ctx: AgentContext):
     base_prompt = ctx.system_prompt or SYSTEM_PROMPT
     if ctx.orchestrate:
         base_prompt += ORCHESTRATION_ADDENDUM
+    if ctx.registry.get("shell_executor"):
+        base_prompt += _shell_hint()
     system_content = mem.system_prompt_with_memory(base_prompt, ctx.state.get("summary", ""))
     messages = [{"role": "system", "content": system_content}]
     messages.extend(ctx.history[-mem.MAX_RECENT:])
@@ -290,6 +303,17 @@ async def run_agent(query: str, ctx: AgentContext):
             # Streamed path already surfaced thought/plan live; sync the exact plan.
             await ctx.ui.plan(plan)
         tool_calls = _sanitize_tool_calls(decision.get("tool_calls") or [])
+
+        # Some models emit 'final_answer' as a (nonexistent) tool call. Treat it as
+        # the answer instead of wasting a step on "tool not found".
+        fa = next((tc for tc in tool_calls if (tc.get("name") or "").lower() == "final_answer"), None)
+        if fa:
+            tool_calls = [tc for tc in tool_calls if tc is not fa]
+            if not (decision.get("final_answer") or "").strip():
+                a = fa.get("args") or {}
+                val = str(a.get("answer") or a.get("text") or a.get("final_answer") or "").strip()
+                if val and val.lower() not in ("null", "none"):
+                    decision["final_answer"] = val
 
         if tool_calls:
             obs = await _run_tools(tool_calls, ctx)
