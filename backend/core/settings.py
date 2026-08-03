@@ -43,9 +43,6 @@ class Settings(BaseSettings):
     web_search_api_key: Optional[str] = Field(None, env="WEB_SEARCH_API_KEY")
     openai_api_key: Optional[str] = Field(None, env="OPENAI_API_KEY") # If used in future
 
-    # Feature Flags (Optional)
-    enable_multi_agent: bool = Field(False, env="ENABLE_MULTI_AGENT")
-
     # ── Sandbox (code / shell execution isolation) ────────────────────────────
     # "auto" uses Docker when available and falls back to in-process ("local");
     # "docker" forces Docker; "local" runs directly on the host (NOT isolated).

@@ -9,14 +9,12 @@ class ToolCall(BaseModel):
 class AgentAction(BaseModel):
     """
     Schema for the Agent's decision output.
-    Supports parallel tool calls, a planning step, and Multi-Agent delegation routing.
+    Supports parallel tool calls and an adaptive planning step.
     """
     thought: Optional[str] = Field(None, description="Detailed reasoning behind the action.")
-    plan: Optional[List[str]] = Field(default_factory=list, description="Step-by-step strategy for solving the request.")
-    route_to: Optional[str] = Field(None, description="In Multi-Agent mode, the sub-agent to delegate to (e.g. 'CoderAgent', 'ResearcherAgent'). Null if using tools or answering directly.")
-    instruction: Optional[str] = Field(None, description="In Multi-Agent mode, the specific directive/task snippet for the delegated sub-agent.")
-    tool_calls: Optional[List[ToolCall]] = Field(default_factory=list, max_length=8, description="List of tools to execute in parallel (max 8). MUST be empty if route_to is used. Never repeat the same call.")
-    final_answer: Optional[str] = Field(None, description="Final response to the user. MUST be null if tool_calls or route_to is used.")
+    plan: Optional[List[str]] = Field(default_factory=list, description="Step-by-step strategy — only for multi-step or tool-using tasks; empty for trivial turns.")
+    tool_calls: Optional[List[ToolCall]] = Field(default_factory=list, max_length=8, description="List of tools to execute in parallel (max 8). Never repeat the same call.")
+    final_answer: Optional[str] = Field(None, description="Final response to the user. MUST be null if tool_calls is used.")
 
     class Config:
         extra = "ignore"
