@@ -69,6 +69,7 @@ class FileArchitectTool:
         Dict with ``text`` summary, ``created`` list, and ``errors`` list.
         """
         created: List[str] = []
+        created_paths: List[str] = []   # absolute paths → surfaced as artifacts
         errors: List[str] = []
 
         # ── Guard: too many files ──────────────────────────────────────────────
@@ -86,6 +87,8 @@ class FileArchitectTool:
             result = self._create_single(rel_path, content, overwrite)
             if result["ok"]:
                 created.append(rel_path)
+                if result.get("path"):
+                    created_paths.append(result["path"])
                 logger.info("file_architect create %s", rel_path)
             else:
                 errors.append(f"{rel_path}: {result['reason']}")
@@ -99,6 +102,8 @@ class FileArchitectTool:
             "text": " ".join(summary_parts),
             "created": created,
             "errors": errors,
+            # Surface created files to the UI artifact panel (HTML preview, etc.).
+            "artifacts": created_paths,
         }
 
     # ── Internal helpers ───────────────────────────────────────────────────────
@@ -147,4 +152,4 @@ class FileArchitectTool:
         except AtomicWriteError as exc:
             return {"ok": False, "reason": str(exc)}
 
-        return {"ok": True}
+        return {"ok": True, "path": str(target)}

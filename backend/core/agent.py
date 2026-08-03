@@ -46,6 +46,7 @@ class AgentContext:
     thread_id: Optional[str] = None                      # persisted conversation id
     history: List[Dict] = field(default_factory=list)    # conversation memory
     state: Dict[str, Any] = field(default_factory=dict)  # session store
+    max_steps: Optional[int] = None                      # agent-loop cap (UI override)
 
 
 # ── Decision ─────────────────────────────────────────────────────────────────
@@ -65,20 +66,176 @@ def _sanitize_tool_calls(tool_calls: List[Dict]) -> List[Dict]:
     return clean
 
 
-async def _decide(model: ModelClient, messages: List[Dict]) -> Optional[Dict]:
+_ESCAPES = {'"': '"', '\\': '\\', '/': '/', 'b': '\b', 'f': '\f', 'n': '\n', 'r': '\r', 't': '\t'}
+
+
+def _value_start(buf: str, key: str) -> int:
+    """Index of a JSON key's value (after `"key":` + whitespace), or -1."""
+    i = buf.find(key)
+    if i < 0:
+        return -1
+    j = buf.find(":", i + len(key))
+    if j < 0:
+        return -1
+    k = j + 1
+    while k < len(buf) and buf[k] in " \t\r\n":
+        k += 1
+    return k
+
+
+def _decode_json_string(buf: str, start: int):
+    """Decode a JSON string starting at `start` (the opening quote).
+    Returns (decoded_so_far, closed). Stops safely mid-escape when partial."""
+    out: List[str] = []
+    i, n = start + 1, len(buf)
+    while i < n:
+        c = buf[i]
+        if c == "\\":
+            if i + 1 >= n:
+                return ("".join(out), False)  # incomplete escape → wait
+            e = buf[i + 1]
+            if e == "u":
+                if i + 6 > n:
+                    return ("".join(out), False)  # incomplete \uXXXX
+                try:
+                    out.append(chr(int(buf[i + 2:i + 6], 16)))
+                except ValueError:
+                    out.append(buf[i + 2:i + 6])
+                i += 6
+                continue
+            out.append(_ESCAPES.get(e, e))
+            i += 2
+            continue
+        if c == '"':
+            return ("".join(out), True)  # closed
+        out.append(c)
+        i += 1
+    return ("".join(out), False)  # ran out → partial
+
+
+def _extract_string_field(buf: str, key: str):
+    """(value_so_far, closed) for a string field, or (None, False) if not started."""
+    k = _value_start(buf, key)
+    if k < 0 or k >= len(buf) or buf[k] != '"':
+        return (None, False)
+    return _decode_json_string(buf, k)
+
+
+def _extract_string_array(buf: str, key: str) -> Optional[List[str]]:
+    """Fully-closed string items of an array field so far, or None if not started."""
+    k = _value_start(buf, key)
+    if k < 0 or k >= len(buf) or buf[k] != "[":
+        return None
+    items: List[str] = []
+    i, n = k + 1, len(buf)
+    while i < n:
+        c = buf[i]
+        if c in " \t\r\n,":
+            i += 1
+            continue
+        if c == "]":
+            break
+        if c == '"':
+            val, closed = _decode_json_string(buf, i)
+            if not closed:
+                break
+            items.append(val)
+            # advance past the closed string (walk to the unescaped closing quote)
+            j = i + 1
+            while j < n:
+                if buf[j] == "\\":
+                    j += 2
+                    continue
+                if buf[j] == '"':
+                    j += 1
+                    break
+                j += 1
+            i = j
+        else:
+            i += 1
+    return items
+
+
+class _DecisionStreamer:
+    """Progressively surfaces thought / plan / final_answer from a streaming JSON
+    decision so the user watches the model work live."""
+
+    def __init__(self, ui: AgentUI):
+        self.ui = ui
+        self.buf = ""
+        self._thought_sent = 0
+        self._thought_done = False
+        self._final_sent = 0
+        self._final_done = False
+        self._plan_sent: List[str] = []
+        self.streamed_final = False
+
+    async def feed(self, chunk: str):
+        self.buf += chunk
+        # thought
+        if not self._thought_done:
+            val, closed = _extract_string_field(self.buf, '"thought"')
+            if val is not None:
+                if len(val) > self._thought_sent:
+                    await self.ui.thinking(val[self._thought_sent:])
+                    self._thought_sent = len(val)
+                if closed:
+                    self._thought_done = True
+                    await self.ui.thinking(done=True)
+        # plan
+        items = _extract_string_array(self.buf, '"plan"')
+        if items is not None and len(items) > len(self._plan_sent):
+            self._plan_sent = list(items)
+            await self.ui.plan(list(items))
+        # final_answer
+        if not self._final_done:
+            val, closed = _extract_string_field(self.buf, '"final_answer"')
+            if val is not None:
+                if len(val) > self._final_sent:
+                    await self.ui.token(val[self._final_sent:])
+                    self._final_sent = len(val)
+                    self.streamed_final = True
+                if closed:
+                    self._final_done = True
+
+    async def finish(self):
+        if self._thought_sent and not self._thought_done:
+            await self.ui.thinking(done=True)
+
+
+async def _decide(model: ModelClient, messages: List[Dict], ui: AgentUI):
+    """Return (decision, streamer). `streamer` is set only when attempt 0 streamed
+    the decision live (so run_agent knows the answer was already surfaced)."""
     for attempt in range(config.RETRY_COUNT):
         try:
-            raw = await model.generate(
-                messages, stream=False,
-                json_mode=(attempt == 0),
-                schema=AGENT_SCHEMA if attempt == 0 else None,
-            )
-            decision = extract_json(raw)
-            if decision:
-                return decision
+            if attempt == 0:
+                gen = await model.generate(messages, stream=True, json_mode=True, schema=AGENT_SCHEMA)
+                streamer = _DecisionStreamer(ui)
+                raw = ""
+                if isinstance(gen, str):
+                    raw = gen
+                    await streamer.feed(gen)
+                else:
+                    async for chunk in gen:
+                        raw += chunk
+                        await streamer.feed(chunk)
+                await streamer.finish()
+                decision = extract_json(raw)
+                if decision:
+                    return decision, streamer
+                await ui.thinking(reset=True)  # drop partial live thought before retry
+            else:
+                raw = await model.generate(messages, stream=False, json_mode=False, schema=None)
+                decision = extract_json(raw)
+                if decision:
+                    return decision, None
         except Exception as e:
             print(f"Decision error (attempt {attempt+1}): {e}")
-    return None
+            try:
+                await ui.thinking(reset=True)
+            except Exception:
+                pass
+    return None, None
 
 
 # ── Main loop ────────────────────────────────────────────────────────────────
@@ -101,13 +258,19 @@ async def run_agent(query: str, ctx: AgentContext):
         user_content += f"\n\nContext from Files (RAG):\n{context_str}"
     messages.append({"role": "user", "content": user_content})
 
-    for _ in range(config.MAX_STEPS):
-        decision = await _decide(ctx.model, messages)
+    for _ in range(ctx.max_steps or config.MAX_STEPS):
+        decision, streamer = await _decide(ctx.model, messages, ctx.ui)
         if not decision:
             await ctx.ui.notice("Model geçerli bir karar üretemedi.", "error")
             return
 
-        await ctx.ui.step(decision.get("thought"), decision.get("plan") or [])
+        plan = decision.get("plan") or []
+        if streamer is None:
+            # Non-streamed fallback: surface thought + plan in one step event.
+            await ctx.ui.step(decision.get("thought"), plan)
+        elif plan:
+            # Streamed path already surfaced thought/plan live; sync the exact plan.
+            await ctx.ui.plan(plan)
         tool_calls = _sanitize_tool_calls(decision.get("tool_calls") or [])
 
         if tool_calls:
@@ -119,7 +282,9 @@ async def run_agent(query: str, ctx: AgentContext):
         # No tools → final answer.
         answer = (decision.get("final_answer") or "").strip()
         if answer:
-            await _stream_text(ctx.ui, answer)
+            # If the streaming decision already emitted the answer live, don't re-stream.
+            if not (streamer and streamer.streamed_final):
+                await _stream_text(ctx.ui, answer)
         else:
             answer = await _compose(ctx.model, messages, ctx.ui)
         await ctx.ui.final(answer)
@@ -259,6 +424,70 @@ async def _approve_file_edit(name: str, kw: Dict, ui: AgentUI) -> bool:
     return True
 
 
+# Rich file-preview support (additive; see docs/frontend-api.md).
+_MAX_FILE_TEXT = 200_000       # chars inlined for text-like files
+_MAX_FILE_B64 = 6_000_000      # bytes inlined as a base64 data URI (e.g. PDF)
+_TEXT_EXTS = {".txt", ".json", ".log", ".py", ".js", ".ts", ".tsx", ".jsx",
+              ".css", ".yaml", ".yml", ".toml", ".ini", ".sql", ".sh", ".xml"}
+
+
+def _read_text_file(path: str) -> str:
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            return f.read(_MAX_FILE_TEXT)
+    except Exception:
+        return ""
+
+
+def _b64_data_uri(path: str, mime: str) -> Optional[str]:
+    try:
+        if os.path.getsize(path) > _MAX_FILE_B64:
+            return None
+        with open(path, "rb") as f:
+            return f"data:{mime};base64," + base64.b64encode(f.read()).decode()
+    except Exception:
+        return None
+
+
+def _table_from(path: str, excel: bool = False) -> Optional[str]:
+    try:
+        import pandas as pd
+        df = pd.read_excel(path) if excel else pd.read_csv(path)
+        return df.head(50).to_html(index=False)
+    except Exception:
+        return None
+
+
+def _file_descriptor(path: str) -> Dict:
+    """Classify a produced file and inline a previewable payload (additive)."""
+    ext = os.path.splitext(path)[1].lower()
+    d: Dict[str, Any] = {"type": "file", "path": path, "name": os.path.basename(path)}
+    if ext in (".html", ".htm"):
+        d["kind"] = "html"
+        d["text"] = _read_text_file(path)
+    elif ext in (".md", ".markdown"):
+        d["kind"] = "markdown"
+        d["text"] = _read_text_file(path)
+    elif ext == ".csv":
+        d["kind"] = "csv"
+        d["text"] = _read_text_file(path)
+        d["table_html"] = _table_from(path)
+    elif ext in (".xlsx", ".xls"):
+        d["kind"] = "excel"
+        d["table_html"] = _table_from(path, excel=True)
+    elif ext == ".pdf":
+        d["kind"] = "pdf"
+        data = _b64_data_uri(path, "application/pdf")
+        if data:
+            d["data"] = data
+    elif ext in _TEXT_EXTS:
+        d["kind"] = "text"
+        d["text"] = _read_text_file(path)
+    else:
+        d["kind"] = "binary"
+    return d
+
+
 def _serialize_artifacts(items: List[Any]) -> List[Dict]:
     """Turn tool artifacts into JSON-serializable descriptors for the frontend."""
     out = []
@@ -287,7 +516,7 @@ def _serialize_artifacts(items: List[Any]) -> List[Dict]:
                     mime = "image/png" if ext == ".png" else "image/jpeg"
                     out.append({"type": "image", "data": f"data:{mime};base64,{b64}"})
                 else:
-                    out.append({"type": "file", "path": item})
+                    out.append(_file_descriptor(item))
                 continue
             # list of link dicts (web_search)
             if isinstance(item, list) and item and isinstance(item[0], dict):

@@ -22,6 +22,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, F
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+import config
 from backend.core.settings import settings
 from backend.core.agent_ui import AgentUI
 from backend.core.agent import AgentContext, run_agent
@@ -41,6 +42,7 @@ from backend.tools.file_editing.file_architect import FileArchitectTool
 from backend.tools.file_editing.file_surgeon import FileSurgeonTool
 
 FRONTEND_DIR = Path(__file__).parent / "frontend"
+WEBUI_DIST = Path(__file__).parent / "webui" / "dist"   # built React SPA (npm run build)
 UPLOAD_DIR = Path(__file__).parent / "data" / "temp" / "uploads"
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
@@ -63,10 +65,38 @@ def _ensure_plotly_js():
 
 _ensure_plotly_js()
 app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+# Built SPA assets (JS/CSS/fonts). Mounted only when a build exists.
+if (WEBUI_DIST / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=str(WEBUI_DIST / "assets")), name="assets")
 
 # Live WebSocket sessions, so HTTP uploads can attach to the right conversation.
 SESSIONS: dict[str, "AgentContext"] = {}
 _ingestor = UniversalIngestor()
+
+
+def _clamp(v, lo, hi):
+    try:
+        return max(lo, min(hi, type(lo)(v)))
+    except (TypeError, ValueError):
+        return None
+
+
+def _apply_settings(ctx: "AgentContext", s: dict) -> None:
+    """Apply UI generation settings to the live model / agent context."""
+    if s.get("temperature") is not None:
+        t = _clamp(s["temperature"], 0.0, 2.0)
+        if t is not None:
+            ctx.model.temperature = t
+    if "top_p" in s:
+        tp = s["top_p"]
+        ctx.model.top_p = None if tp in (None, "") else _clamp(tp, 0.0, 1.0)
+    if "max_tokens" in s:
+        mt = _clamp(s.get("max_tokens") or 0, 0, 32768)
+        ctx.model.max_tokens = mt or 0
+    if s.get("max_steps") is not None:
+        ms = _clamp(s["max_steps"], 1, 20)
+        if ms is not None:
+            ctx.max_steps = ms
 
 
 def build_registry() -> ToolRegistry:
@@ -92,6 +122,19 @@ class WebSocketUI(AgentUI):
 
     async def step(self, thought, plan):
         await self._send({"type": "step", "thought": thought, "plan": plan})
+
+    async def thinking(self, text="", done=False, reset=False):
+        msg = {"type": "thinking"}
+        if reset:
+            msg["reset"] = True
+        elif done:
+            msg["done"] = True
+        else:
+            msg["text"] = text
+        await self._send(msg)
+
+    async def plan(self, plan):
+        await self._send({"type": "plan", "plan": plan})
 
     async def tool_start(self, tool_id, name, args):
         await self._send({"type": "tool_start", "id": tool_id, "name": name, "args": args})
@@ -129,7 +172,9 @@ class WebSocketUI(AgentUI):
 
 @app.get("/")
 async def index():
-    return FileResponse(FRONTEND_DIR / "index.html")
+    # Prefer the built React SPA; fall back to the legacy vanilla UI if unbuilt.
+    spa = WEBUI_DIST / "index.html"
+    return FileResponse(spa if spa.exists() else FRONTEND_DIR / "index.html")
 
 
 @app.get("/api/models")
@@ -147,6 +192,17 @@ async def list_models():
             return {"provider": provider, "models": await get_ollama_models()}
     except Exception as e:
         return {"provider": provider, "models": [], "error": str(e)}
+
+
+@app.get("/api/settings")
+async def get_settings():
+    """Current generation defaults, so the UI settings panel shows real values."""
+    return {
+        "temperature": settings.temperature,
+        "top_p": 1.0,
+        "max_tokens": 0,          # 0 = unlimited
+        "max_steps": config.MAX_STEPS,
+    }
 
 
 @app.get("/api/conversations")
@@ -217,7 +273,11 @@ async def ws_endpoint(ws: WebSocket):
             mtype = msg.get("type")
             if mtype == "user_message":
                 if msg.get("model") and msg["model"] != ctx.model.model_name:
-                    ctx.model = ModelClient(model_name=msg["model"])
+                    # Preserve the user's generation settings across a model switch.
+                    ctx.model = ModelClient(model_name=msg["model"],
+                                            temperature=ctx.model.temperature,
+                                            top_p=ctx.model.top_p,
+                                            max_tokens=ctx.model.max_tokens)
                 content = msg.get("content", "")
                 if msg.get("deep_research"):
                     content = ("[DeepSearch modu] Bu soruyu 'deep_research' tool'unu "
@@ -225,6 +285,11 @@ async def ws_endpoint(ws: WebSocket):
                 current = asyncio.create_task(_run(content))
             elif mtype == "approval_response":
                 ui.resolve_approval(msg.get("id"), bool(msg.get("approved")))
+            elif mtype == "settings":
+                _apply_settings(ctx, msg.get("settings") or {})
+            elif mtype == "persist":
+                # Frontend's rich UI state (timeline + artifacts) for the current thread.
+                await asyncio.to_thread(convs.save_ui, ctx.thread_id, msg.get("ui") or {})
             elif mtype == "resume":
                 data = await asyncio.to_thread(convs.load, msg.get("id"))
                 if data:
@@ -232,7 +297,7 @@ async def ws_endpoint(ws: WebSocket):
                     ctx.state["summary"] = data.get("summary", "")
                     ctx.thread_id = data["id"]
                     await ui._send({"type": "history", "thread_id": ctx.thread_id,
-                                    "messages": ctx.history})
+                                    "messages": ctx.history, "ui": data.get("ui")})
             elif mtype == "new":
                 ctx.history = []
                 ctx.state = {}

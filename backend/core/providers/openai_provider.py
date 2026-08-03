@@ -29,6 +29,8 @@ class OpenAIProvider(LLMProvider):
             "messages": messages,
             "temperature": options.get("temperature", 0.7),
         }
+        if options.get("top_p") is not None:
+            kwargs["top_p"] = options["top_p"]
         # num_ctx has no direct OpenAI equivalent; the server owns the context
         # window. We can still cap generation length if provided.
         if options.get("max_tokens"):

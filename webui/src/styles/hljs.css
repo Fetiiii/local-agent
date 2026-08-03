@@ -1,0 +1,53 @@
+/* Minimal, theme-aware syntax highlighting tuned to the Copper & Patina palette.
+   Uses palette CSS variables so tokens read well in both dark and light. */
+.hljs-comment,
+.hljs-quote {
+  color: var(--muted);
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-doctag,
+.hljs-name {
+  color: var(--accent);
+  font-weight: 600;
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-meta .hljs-string {
+  color: var(--patina);
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link,
+.hljs-selector-class,
+.hljs-selector-id {
+  color: var(--warn);
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-built_in,
+.hljs-class .hljs-title,
+.hljs-type {
+  color: var(--accent-hover);
+}
+.hljs-variable,
+.hljs-template-variable,
+.hljs-attr,
+.hljs-property {
+  color: var(--text);
+}
+.hljs-deletion {
+  color: var(--err);
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 700;
+}

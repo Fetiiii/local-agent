@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Local Agent
+Comment=Yerel LLM ajanı — model + web arayüzünü tek tıkla başlat
+Exec=/home/feitcagri/Masaüstü/local-agent/start.sh
+Path=/home/feitcagri/Masaüstü/local-agent
+Icon=/home/feitcagri/Masaüstü/local-agent/assets/localagent.svg
+Terminal=true
+Categories=Development;Utility;

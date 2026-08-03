@@ -37,11 +37,22 @@ PDF · DOCX · XLSX · XLS · CSV  (legacy `.doc` — convert to `.docx` first)
 | `web_scraper` | Extract readable content from a URL |
 | `image_analysis` | Analyze images with a local vision model |
 
-### UI (custom FastAPI + WebSocket, vanilla JS — no build step)
-- Streaming responses with collapsible thought/plan and tool steps
-- Model selector (auto-listed from the provider), file upload → RAG
-- Inline artifacts: plots, tables, links; human-in-the-loop approval for file edits
-- Sidebar conversation history with resume (persisted as JSON)
+### UI — "Copper & Patina" (React + Vite + TypeScript + Tailwind)
+A modern three-column app (conversations · chat · artifacts) served by the same
+FastAPI backend. Fully **offline** (all JS/CSS/fonts bundled locally, no CDN),
+dark/light themes.
+- **Live agent process** (Claude-Code style): a living plan/to-do checklist,
+  collapsible reasoning, per-tool cards, and a **terminal view** for host shell
+  commands — see the command and its output stream in real time
+- **Streaming** Markdown answers with syntax-highlighted, copyable code blocks;
+  a "thinking…" indicator until the first token (no dead-air)
+- **Artifact side panel**: interactive Plotly charts, tables, images, web-search
+  sources, and Claude-artifacts–style **HTML preview** (Code | Preview) plus
+  Markdown/CSV/Excel/PDF previews
+- Model selector, DeepSearch toggle, file upload → RAG, human-in-the-loop
+  approval cards, sidebar conversation history with resume
+- The legacy zero-build vanilla UI (`frontend/index.html`) is kept as a fallback
+  and is served automatically if the React app hasn't been built yet
 
 ---
 
@@ -205,13 +216,28 @@ instead of failing silently.
 ## Running
 
 Make sure your model backend is running (Ollama, or a llama.cpp `llama-server`
-— see [Configuration](#configuration)), then start the web server:
+— see [Configuration](#configuration)).
+
+**Build the frontend once** (produces `webui/dist/`, which FastAPI serves):
+
+```bash
+cd webui && npm install && npm run build && cd ..
+```
+
+Then start the web server:
 
 ```bash
 .venv/bin/uvicorn server:app --host 127.0.0.1 --port 8000
 ```
 
-Then open [http://localhost:8000](http://localhost:8000) in your browser.
+Open [http://localhost:8000](http://localhost:8000) in your browser. If you skip
+the build step, the server falls back to the legacy vanilla UI automatically.
+
+**Frontend development** (hot-reload, proxies `/ws` + `/api` + `/static` to :8000):
+
+```bash
+cd webui && npm run dev    # http://localhost:5173
+```
 
 Conversations are persisted as JSON files under `data/conversations/` and appear
 in the sidebar; click one to resume it.
@@ -222,8 +248,11 @@ in the sidebar; click one to resume it.
 
 ```
 lokal-agent/
-├── server.py                   # FastAPI + WebSocket entry point
-├── frontend/index.html         # Vanilla JS chat UI (no build step)
+├── server.py                   # FastAPI + WebSocket entry point (serves webui/dist)
+├── webui/                       # React + Vite + TS frontend ("Copper & Patina")
+│   ├── src/                     # components (chat · agent · artifacts · layout)
+│   └── dist/                    # build output served by FastAPI (npm run build)
+├── frontend/index.html         # Legacy vanilla UI (fallback, no build step)
 ├── prompts.py                  # System prompts for the agent
 ├── config.py                   # Thin proxy over backend.core.settings
 ├── docker/sandbox.Dockerfile   # Image for the code-execution sandbox

@@ -6,3 +6,7 @@ data/
 .env
 logs/*.log
 frontend/vendor/
+
+# Node / frontend build
+node_modules/
+webui/dist/

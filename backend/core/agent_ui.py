@@ -17,6 +17,15 @@ class AgentUI(ABC):
     async def step(self, thought: Optional[str], plan: List[str]) -> None:
         """A reasoning step: the agent's thought + plan for this iteration."""
 
+    async def thinking(self, text: str = "", done: bool = False, reset: bool = False) -> None:
+        """Live reasoning delta streamed as the model produces its decision.
+        `text` is appended to the current thought; `done=True` closes it;
+        `reset=True` drops a partial thought (e.g. after a failed parse).
+        Default no-op so non-streaming adapters keep working."""
+
+    async def plan(self, plan: List[str]) -> None:
+        """Live plan/to-do update as items are produced. Default no-op."""
+
     @abstractmethod
     async def tool_start(self, tool_id: str, name: str, args: Dict[str, Any]) -> None:
         """A tool is about to run."""

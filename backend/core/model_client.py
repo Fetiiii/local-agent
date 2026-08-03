@@ -16,20 +16,28 @@ from backend.core.providers import build_provider
 
 class ModelClient:
     def __init__(self, model_name: Optional[str] = None, provider: Optional[str] = None,
-                 temperature: Optional[float] = None):
+                 temperature: Optional[float] = None, top_p: Optional[float] = None,
+                 max_tokens: Optional[int] = None):
         self.model_name = model_name or settings.model_name
         self.provider_name = (provider or settings.llm_provider or "ollama").lower()
-        # Per-instance temperature override (e.g. from the UI); else settings default.
+        # Per-instance overrides (e.g. from the UI settings panel); else defaults.
         self.temperature = temperature if temperature is not None else settings.temperature
+        self.top_p = top_p                 # None → provider default
+        self.max_tokens = max_tokens       # None/0 → unlimited
         self.provider = build_provider(self.provider_name, self.model_name)
         print(f"🤖 Model Client ready: {self.model_name} (provider={self.provider_name})")
 
     def _build_options(self) -> Dict:
-        return {
+        opts: Dict = {
             "temperature": self.temperature,
             "num_ctx": settings.num_ctx,
             "keep_alive": -1,
         }
+        if self.top_p is not None:
+            opts["top_p"] = self.top_p
+        if self.max_tokens:
+            opts["max_tokens"] = self.max_tokens
+        return opts
 
     async def generate(
         self,

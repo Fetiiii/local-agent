@@ -29,24 +29,36 @@ Run the backend: `.venv/bin/uvicorn server:app --host 127.0.0.1 --port 8000`
 ### Client → server
 
 ```jsonc
-{ "type": "user_message", "content": "...", "model": "<optional model id>" }
+{ "type": "user_message", "content": "...", "model": "<optional model id>",
+  "deep_research": false }   // deep_research=true routes the turn through DeepSearch
 { "type": "approval_response", "id": "<approval id>", "approved": true }
 { "type": "resume", "id": "<thread_id>" }   // load a saved conversation
 { "type": "new" }                            // start a fresh conversation
+{ "type": "persist", "ui": { "messages": [...], "artifacts": [...] } } // save rich UI state for this thread
 ```
+
+`persist` lets the frontend store the full agent process (thinking, tool cards,
+terminal, artifacts) — not just the final answer — so a resumed conversation
+looks exactly as it did live. Send it when a turn finishes (`done`). The payload
+is the frontend's own view model; the backend stores it verbatim under the
+conversation's `ui` key and returns it on `resume` (see `history.ui`).
 
 ### Server → client
 
 ```jsonc
 { "type": "session", "id": "<sid>", "thread_id": "<tid>" }   // on connect
-{ "type": "step", "thought": "...", "plan": ["...", "..."] } // one per reasoning step
+{ "type": "step", "thought": "...", "plan": ["...", "..."] } // non-streamed fallback: whole reasoning step at once
+{ "type": "thinking", "text": "..." }                        // live reasoning delta (streamed decision)
+{ "type": "thinking", "done": true }                         // reasoning finished (collapse the live thought)
+{ "type": "thinking", "reset": true }                        // drop a partial thought (parse failed → retry)
+{ "type": "plan", "plan": ["...", "..."] }                   // live plan/to-do update as items form
 { "type": "tool_start", "id": "<tool id>", "name": "data_analyst", "args": {...} }
 { "type": "tool_end", "id": "<tool id>", "name": "...", "result": "text", "artifacts": [...] }
 { "type": "token", "text": "..." }        // streaming final-answer chunk
 { "type": "final", "text": "..." }        // full final answer
 { "type": "notice", "text": "...", "level": "info"|"warn"|"error" }
 { "type": "approval_request", "id": "<id>", "title": "...", "detail": "markdown" }
-{ "type": "history", "thread_id": "<tid>", "messages": [{ "role", "content" }] } // after resume
+{ "type": "history", "thread_id": "<tid>", "messages": [{ "role", "content" }], "ui"?: {...} } // after resume; `ui` = persisted rich state if present
 { "type": "thread", "id": "<tid>" }       // after "new"
 { "type": "done" }                         // turn finished (re-enable input)
 ```
@@ -55,11 +67,13 @@ Run the backend: `.venv/bin/uvicorn server:app --host 127.0.0.1 --port 8000`
 
 ```
 user_message
-  → step  (thought + plan)
+  → thinking*  (live reasoning delta) ; plan*  (live to-do)   // streamed decision
+      ‖ or, non-streamed fallback: step (thought + plan) at once
   → tool_start / tool_end   (0..N, may repeat across steps)
       ↳ approval_request → (client) approval_response   // HITL, blocks the tool
-  → token*  then  final     // streamed answer
+  → token*  then  final     // answer (streams live within the decision, or via token*)
   → done
+  ← (client) persist        // frontend saves rich UI state for resume
 ```
 
 `approval_request` can arrive mid-turn (file edits, host shell commands). The
@@ -75,9 +89,20 @@ in a background task so the socket stays free.
 { "type": "plotly",  "json": "<plotly figure JSON>" }         // Plotly.newPlot(el, fig.data, fig.layout)
 { "type": "table",   "html": "<table>...</table>" }           // DataFrame.head
 { "type": "links",   "items": [{ "title", "link", "snippet" }] } // web_search
-{ "type": "file",    "path": "..." }
 { "type": "text",    "text": "..." }
+
+// Rich file preview (produced files). `kind` selects the viewer; the payload is
+// inlined so the frontend needs no extra fetch:
+{ "type": "file", "path": "...", "name": "report.html", "kind": "html",
+  "text": "<source for html/markdown/csv/text kinds>",
+  "table_html": "<pandas head() html for csv/excel>",
+  "data": "data:application/pdf;base64,..." }   // pdf/binary, size-capped (may be absent if too large)
+// kind ∈ html | markdown | csv | excel | pdf | text | binary
 ```
+
+Legacy note: older builds emitted `{ "type": "file", "path": "..." }` with no
+`kind`. Frontends should tolerate a missing `kind`/payload and fall back to
+showing the path.
 
 ---
 
@@ -91,8 +116,9 @@ in a background task so the socket stays free.
   - `plotly` → interactive chart, `table` → rendered table, `image` → `<img>`,
     `links` → sources list (web search: which URLs were visited).
   - **HTML/Markdown/file preview** (Claude-artifacts style): show code + a
-    rendered view (HTML in a sandboxed `<iframe>`). Backend support needed to
-    surface file artifacts — extend `_serialize_artifacts` in `backend/core/agent.py`.
+    rendered view (HTML in a sandboxed `<iframe srcdoc>`). Backed by the rich
+    `file` descriptor above (`_serialize_artifacts` in `backend/core/agent.py`
+    inlines the payload — no extra fetch needed).
 - **Serving**: build the SPA to static files and let FastAPI serve them (mount
   or `/`), or run Vite dev-server proxying `/ws` + `/api` to :8000.
 - The event/REST contract above is the stable seam — extend it additively.

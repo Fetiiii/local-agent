@@ -21,6 +21,10 @@ class OllamaProvider(LLMProvider):
             "temperature": options.get("temperature", 0.7),
             "num_ctx": options.get("num_ctx", 8192),
         }
+        if options.get("top_p") is not None:
+            mapped["top_p"] = options["top_p"]
+        if options.get("max_tokens"):
+            mapped["num_predict"] = options["max_tokens"]
         if "keep_alive" in options:
             mapped["keep_alive"] = options["keep_alive"]
         return mapped

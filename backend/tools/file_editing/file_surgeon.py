@@ -163,6 +163,8 @@ class FileSurgeonTool:
             ),
             "tier": match_result["tier"],
             "path": str(target),
+            # Surface the edited file to the UI artifact panel (HTML preview, etc.).
+            "artifacts": [str(target)],
         }
 
     # ── Matching engine ────────────────────────────────────────────────────────

@@ -55,6 +55,22 @@ def save(tid: str, history: List[Dict], summary: str = "", title: Optional[str] 
     p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def save_ui(tid: str, ui: Dict) -> None:
+    """Attach the frontend's rich UI state (timeline + artifacts) to an existing
+    conversation so the full agent process — not just the final answer — survives
+    resume. No-op if the conversation file doesn't exist yet."""
+    p = _path(tid)
+    if not p.exists():
+        return
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return
+    data["ui"] = ui
+    data["updated"] = time.time()
+    p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def load(tid: str) -> Optional[Dict]:
     p = _path(tid)
     if not p.exists():

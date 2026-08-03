@@ -25,6 +25,15 @@ else
   echo "→ .env zaten var, dokunulmadı"
 fi
 
+# ── Frontend (React SPA) build ────────────────────────────────────
+if command -v npm >/dev/null 2>&1; then
+  echo "→ Frontend derleniyor (webui → dist)"
+  ( cd webui && npm install && npm run build )
+else
+  echo "⚠️ npm yok — frontend derlenmedi. Sunucu eski vanilla UI'ye düşer."
+  echo "   Node.js kurup 'cd webui && npm install && npm run build' çalıştır."
+fi
+
 # ── Sandbox Docker image ──────────────────────────────────────────
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   echo "→ Sandbox Docker imajı derleniyor (ilk sefer birkaç dk)"
@@ -36,5 +45,6 @@ fi
 
 echo ""
 echo "✅ Kurulum tamam."
-echo "   1) Model backend'ini başlat (Ollama, ya da llama.cpp llama-server)."
-echo "   2) ./run.sh  →  http://localhost:8000"
+echo "   TEK TIKLA:  ./start.sh   (model + web + tarayıcıyı birlikte açar)"
+echo "               ya da masaüstündeki 'Local Agent' simgesine çift tıkla."
+echo "   Yalnız web: ./run.sh     (modeli kendin başlatırsan)"
