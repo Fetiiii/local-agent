@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional
 
 import config
 from backend.core.settings import settings
-from prompts import SYSTEM_PROMPT
+from prompts import SYSTEM_PROMPT, ORCHESTRATION_ADDENDUM, PROMPT_CODER, PROMPT_RESEARCHER
 from utils.helpers import extract_json
 from backend.core.model_client import ModelClient
 from backend.core.schemas import AgentAction
@@ -47,6 +47,21 @@ class AgentContext:
     history: List[Dict] = field(default_factory=list)    # conversation memory
     state: Dict[str, Any] = field(default_factory=dict)  # session store
     max_steps: Optional[int] = None                      # agent-loop cap (UI override)
+    orchestrate: bool = False                            # manager may delegate to sub-agents
+    system_prompt: Optional[str] = None                  # override base prompt (sub-agents)
+
+
+# ── Orchestration (opt-in "smart B") ─────────────────────────────────────────
+# A sub-agent = a child run_agent with a scoped tool subset + focused prompt +
+# isolated history, streamed through a SubAgentUI that captures its final answer.
+SUB_AGENTS: Dict[str, Dict[str, Any]] = {
+    "coder": {"prompt": PROMPT_CODER,
+              "tools": ["data_analyst", "file_reader_v2", "file_architect",
+                        "file_surgeon", "shell_executor"]},
+    "researcher": {"prompt": PROMPT_RESEARCHER,
+                   "tools": ["web_search", "web_scraper", "deep_research"]},
+}
+_AGENT_ALIASES = {"coderagent": "coder", "researcheragent": "researcher"}
 
 
 # ── Decision ─────────────────────────────────────────────────────────────────
@@ -241,7 +256,10 @@ async def _decide(model: ModelClient, messages: List[Dict], ui: AgentUI):
 # ── Main loop ────────────────────────────────────────────────────────────────
 
 async def run_agent(query: str, ctx: AgentContext):
-    system_content = mem.system_prompt_with_memory(SYSTEM_PROMPT, ctx.state.get("summary", ""))
+    base_prompt = ctx.system_prompt or SYSTEM_PROMPT
+    if ctx.orchestrate:
+        base_prompt += ORCHESTRATION_ADDENDUM
+    system_content = mem.system_prompt_with_memory(base_prompt, ctx.state.get("summary", ""))
     messages = [{"role": "system", "content": system_content}]
     messages.extend(ctx.history[-mem.MAX_RECENT:])
 
@@ -338,7 +356,92 @@ async def _run_tools(tool_calls: List[Dict], ctx: AgentContext) -> str:
     return "\n\n---\n\n".join(combined)
 
 
+def _scoped_registry(reg: ToolRegistry, names: List[str]) -> ToolRegistry:
+    """A registry exposing only `names` — a sub-agent's allowed tools."""
+    sub = ToolRegistry()
+    for n in names:
+        t = reg.get(n)
+        if t:
+            sub.register(t)
+    return sub
+
+
+class SubAgentUI(AgentUI):
+    """Wraps the parent UI while a sub-agent runs: forwards visible activity
+    (tools, notices, approvals) so the user watches the specialist work, but
+    SUPPRESSES live thought/plan/token streaming (which would clobber the
+    manager's thought box + PlanStrip) and CAPTURES the sub-agent's final answer
+    so the manager can consume it as an observation."""
+
+    def __init__(self, parent: AgentUI, label: str):
+        self._p = parent
+        self._label = label
+        self.final_text: Optional[str] = None
+
+    async def step(self, thought, plan):
+        if thought:
+            await self._p.step(f"🤝 {self._label}: {thought}", [])
+
+    async def thinking(self, text="", done=False, reset=False):
+        pass  # suppress live streaming (avoid interleaving with the manager)
+
+    async def plan(self, plan):
+        pass  # sub-agent plan must not pollute the manager's PlanStrip
+
+    async def tool_start(self, tool_id, name, args):
+        await self._p.tool_start(tool_id, name, args)
+
+    async def tool_end(self, tool_id, name, result, artifacts=None):
+        await self._p.tool_end(tool_id, name, result, artifacts)
+
+    async def token(self, text):
+        pass  # final answer is captured below, not streamed as THE final
+
+    async def final(self, text):
+        self.final_text = text
+
+    async def notice(self, text, level="info"):
+        await self._p.notice(f"[{self._label}] {text}", level)
+
+    async def ask_approval(self, title, detail):
+        return await self._p.ask_approval(title, detail)
+
+
+async def _delegate(args: Dict, ctx: AgentContext):
+    """Run a specialist sub-agent (child run_agent) with a scoped tool set,
+    focused prompt, and isolated context; return its final as an observation."""
+    if not ctx.orchestrate:
+        return ("❌ Delegation is not enabled for this turn.", [])
+    raw = str(args.get("agent", "")).strip().lower()
+    agent = _AGENT_ALIASES.get(raw, raw)
+    task = (args.get("task") or args.get("instruction") or "").strip()
+    spec = SUB_AGENTS.get(agent)
+    if not spec:
+        return (f"❌ Unknown sub-agent '{args.get('agent')}'. Use 'coder' or 'researcher'.", [])
+    if not task:
+        return ("❌ Delegation needs a non-empty 'task'.", [])
+
+    label = f"{agent}Agent"
+    await ctx.ui.notice(f"🤝 {label}'a delege edildi: {task}", "info")
+    sub_ui = SubAgentUI(ctx.ui, label)
+    child = AgentContext(
+        ui=sub_ui, model=ctx.model, registry=_scoped_registry(ctx.registry, spec["tools"]),
+        rag=ctx.rag, thread_id=ctx.thread_id, history=[], state=ctx.state,
+        max_steps=ctx.max_steps, orchestrate=False, system_prompt=spec["prompt"],
+    )
+    try:
+        await run_agent(task, child)
+    except Exception as e:
+        return (f"❌ {label} failed: {e}", [])
+    await ctx.ui.notice(f"✅ {label} tamamladı.", "info")
+    return (f"[{label} result]\n{sub_ui.final_text or '(sub-agent produced no result)'}", [])
+
+
 async def _exec_tool(name: str, args: Dict, ctx: AgentContext):
+    # Orchestration: 'delegate' is handled in-core (it needs ctx), not via the registry.
+    if name == "delegate":
+        return await _delegate(args, ctx)
+
     tool = ctx.registry.get(name)
     if not tool:
         return (f"❌ Tool '{name}' not found.", [])
@@ -348,6 +451,20 @@ async def _exec_tool(name: str, args: Dict, ctx: AgentContext):
         kw = {"query": args.get("query", "")}
     elif name == "data_analyst":
         kw = {"code": args.get("code", "")}
+    elif name == "file_architect":
+        # Harden against malformed model output: file contents must be strings
+        # (small models sometimes emit a bool/number/object), and 'overwrite'
+        # must be a real bool (not the string "False", which is truthy).
+        files = args.get("files")
+        if isinstance(files, dict):
+            files = {k: (v if isinstance(v, str)
+                         else json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list))
+                         else str(v))
+                     for k, v in files.items()}
+        ov = args.get("overwrite", False)
+        if isinstance(ov, str):
+            ov = ov.strip().lower() in ("true", "1", "yes")
+        kw = {**args, "files": files if files is not None else {}, "overwrite": bool(ov)}
     elif name == "image_analysis":
         p = args.get("image_path") or args.get("path")
         if not p or not os.path.exists(p):

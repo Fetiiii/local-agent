@@ -282,6 +282,8 @@ async def ws_endpoint(ws: WebSocket):
                 if msg.get("deep_research"):
                     content = ("[DeepSearch modu] Bu soruyu 'deep_research' tool'unu "
                                "kullanarak derinlemesine araştır:\n" + content)
+                # Orchestration mode (opt-in): manager may delegate to sub-agents this turn.
+                ctx.orchestrate = bool(msg.get("orchestrate"))
                 current = asyncio.create_task(_run(content))
             elif mtype == "approval_response":
                 ui.resolve_approval(msg.get("id"), bool(msg.get("approved")))
