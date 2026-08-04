@@ -26,6 +26,7 @@ MODEL=$(env_get MODEL_NAME)
 NUM_CTX=$(env_get NUM_CTX); NUM_CTX=${NUM_CTX:-8192}
 LLAMA_SERVER_BIN=$(env_get LLAMA_SERVER_BIN)
 LLAMA_SERVER_ARGS=$(env_get LLAMA_SERVER_ARGS)
+MANAGE_LLAMA=$(env_get MANAGE_LLAMA_SERVER); MANAGE_LLAMA=${MANAGE_LLAMA:-true}
 
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8000}"
@@ -58,7 +59,7 @@ if [ ! -f webui/dist/index.html ]; then
 fi
 
 # ── 2) Model backend (llama.cpp) ─────────────────────────────────────────────
-if [ "$PROVIDER" = "openai" ]; then
+if [ "$PROVIDER" = "openai" ] && [ "$MANAGE_LLAMA" != "true" ] && [ "$MANAGE_LLAMA" != "1" ]; then
   if model_up; then
     echo "✅ Model backend zaten açık (:$MODEL_PORT)"
   else
@@ -86,6 +87,8 @@ if [ "$PROVIDER" = "openai" ]; then
       echo "   (İpucu: .env'e LLAMA_SERVER_BIN / LLAMA_SERVER_ARGS ekleyebilirsin.)"
     fi
   fi
+elif [ "$PROVIDER" = "openai" ]; then
+  echo "🧠 Model backend'i web sunucusu yönetiyor (MANAGE_LLAMA_SERVER=true) — UI'dan model değiştirilebilir."
 elif [ "$PROVIDER" = "ollama" ]; then
   echo "ℹ️ Provider=ollama — 'ollama serve' çalışıyor varsayılıyor."
 fi

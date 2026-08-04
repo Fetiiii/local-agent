@@ -26,6 +26,18 @@ class Settings(BaseSettings):
     # Model context window passed to the backend (Ollama). For llama.cpp this is
     # set at server launch with -c; keep them in sync.
     num_ctx: int = Field(16384, env="NUM_CTX")
+
+    # ── llama.cpp model management (UI model switching) ───────────────────────
+    # Folder of .gguf models the UI can switch between. Empty → the folder that
+    # holds MODEL_NAME. A sibling "mmproj-*.gguf" is auto-attached (vision).
+    models_dir: str = Field("", env="MODELS_DIR")
+    # llama-server binary; empty → auto-detect (PATH / ~/llama.cpp/build/bin).
+    llama_server_bin: str = Field("", env="LLAMA_SERVER_BIN")
+    # Extra flags appended to every llama-server launch (e.g. "-ngl 99 --flash-attn on").
+    llama_server_args: str = Field("", env="LLAMA_SERVER_ARGS")
+    # Let the web server start/stop/switch llama-server itself (needed for UI
+    # model switching). If false, it only talks to an already-running server.
+    manage_llama_server: bool = Field(True, env="MANAGE_LLAMA_SERVER")
     # Default sampling temperature (UI slider overrides this per-session).
     temperature: float = Field(0.7, env="TEMPERATURE")
 

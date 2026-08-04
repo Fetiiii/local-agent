@@ -18,12 +18,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Body
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 import config
 from backend.core.settings import settings
+from backend.core.llama_manager import llama_manager
 from backend.core.agent_ui import AgentUI
 from backend.core.agent import AgentContext, run_agent
 from backend.core.model_client import ModelClient
@@ -182,6 +183,13 @@ async def list_models():
     provider = (settings.llm_provider or "ollama").lower()
     try:
         if provider == "openai":
+            # Local .gguf folder → real switchable list. Fall back to whatever the
+            # running server reports (single loaded model) if no folder is set.
+            local = llama_manager.list_models()
+            if local:
+                return {"provider": provider, "models": local,
+                        "current": llama_manager.current(),
+                        "manageable": settings.manage_llama_server}
             from openai import AsyncOpenAI
             client = AsyncOpenAI(base_url=settings.openai_base_url,
                                  api_key=settings.openai_api_key or "not-needed")
@@ -192,6 +200,25 @@ async def list_models():
             return {"provider": provider, "models": await get_ollama_models()}
     except Exception as e:
         return {"provider": provider, "models": [], "error": str(e)}
+
+
+@app.post("/api/model/switch")
+async def switch_model(payload: dict = Body(...)):
+    """Relaunch llama-server with a different local .gguf (UI model switch).
+    Kills the current model, so any in-flight generation on it will error out."""
+    res = await llama_manager.switch((payload or {}).get("model", ""))
+    return res
+
+
+@app.on_event("startup")
+async def _startup():
+    if (settings.llm_provider or "").lower() == "openai":
+        await llama_manager.ensure_started()
+
+
+@app.on_event("shutdown")
+async def _shutdown():
+    llama_manager.shutdown()
 
 
 @app.get("/api/settings")
