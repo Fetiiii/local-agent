@@ -56,7 +56,7 @@ class FakeModel:
         self.saw_coder_prompt = False
         self.coder_tools_seen = []
 
-    async def generate(self, messages, stream=False, json_mode=False, schema=None):
+    async def generate(self, messages, stream=False, json_mode=False, schema=None, max_tokens=None):
         sysc = messages[0]["content"]
         if "CODER sub-agent" in sysc:
             self.saw_coder_prompt = True

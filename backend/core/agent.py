@@ -29,6 +29,9 @@ from backend.tools import ToolRegistry
 AGENT_SCHEMA = AgentAction.model_json_schema()
 MAX_TOOL_CALLS = 8
 MAX_OBS_CHARS = 8000
+# Cap a single generation so a degenerate loop can't run away (seen: a 12.7k-token
+# decision burning ~5 min). Generous enough for large multi-file writes.
+DECISION_MAX_TOKENS = 8192
 
 _COMPOSE_INSTRUCTION = (
     "Based on everything above, write your final answer to the user now. "
@@ -224,7 +227,8 @@ async def _decide(model: ModelClient, messages: List[Dict], ui: AgentUI):
     for attempt in range(config.RETRY_COUNT):
         try:
             if attempt == 0:
-                gen = await model.generate(messages, stream=True, json_mode=True, schema=AGENT_SCHEMA)
+                gen = await model.generate(messages, stream=True, json_mode=True,
+                                           schema=AGENT_SCHEMA, max_tokens=DECISION_MAX_TOKENS)
                 streamer = _DecisionStreamer(ui)
                 raw = ""
                 if isinstance(gen, str):
@@ -240,7 +244,8 @@ async def _decide(model: ModelClient, messages: List[Dict], ui: AgentUI):
                     return decision, streamer
                 await ui.thinking(reset=True)  # drop partial live thought before retry
             else:
-                raw = await model.generate(messages, stream=False, json_mode=False, schema=None)
+                raw = await model.generate(messages, stream=False, json_mode=False,
+                                           schema=None, max_tokens=DECISION_MAX_TOKENS)
                 decision = extract_json(raw)
                 if decision:
                     return decision, None
@@ -391,7 +396,7 @@ async def _compose(model: ModelClient, messages: List[Dict], ui: AgentUI) -> str
     full = ""
     try:
         gen = await model.generate(messages + [{"role": "user", "content": _COMPOSE_INSTRUCTION}],
-                                   stream=True, json_mode=False)
+                                   stream=True, json_mode=False, max_tokens=DECISION_MAX_TOKENS)
         if isinstance(gen, str):
             full = gen
             await ui.token(gen)

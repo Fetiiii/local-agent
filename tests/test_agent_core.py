@@ -57,7 +57,7 @@ class FakeModel:
         self.scripted = list(scripted)
         self.model_name = "fake"
 
-    async def generate(self, messages, stream=False, json_mode=False, schema=None):
+    async def generate(self, messages, stream=False, json_mode=False, schema=None, max_tokens=None):
         resp = self.scripted.pop(0) if self.scripted else '{"final_answer": "done"}'
         if stream:
             async def _gen():

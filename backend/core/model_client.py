@@ -45,8 +45,11 @@ class ModelClient:
         stream: bool = True,
         json_mode: bool = False,
         schema: Optional[Dict] = None,
+        max_tokens: Optional[int] = None,
     ) -> Union[AsyncGenerator[str, None], str]:
         options = self._build_options()
+        if max_tokens:
+            options["max_tokens"] = max_tokens   # per-call cap (overrides instance/unlimited)
         return await self.provider.generate(
             messages, options=options, stream=stream, json_mode=json_mode, schema=schema
         )
