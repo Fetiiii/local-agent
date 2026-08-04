@@ -7,10 +7,13 @@ import { ToolCard } from './ToolCard'
 import { TerminalBlock } from './TerminalBlock'
 import { ApprovalCard } from './ApprovalCard'
 import { NoticeLine } from './NoticeLine'
+import { DelegationBlock } from './DelegationBlock'
 
 type StepItem = Extract<TimelineItem, { kind: 'step' }>
+type NonStep = Exclude<TimelineItem, { kind: 'step' }>
+type ToolItem = Extract<TimelineItem, { kind: 'tool' }>
 
-export function renderTimelineItem(item: Exclude<TimelineItem, { kind: 'step' }>): ReactNode {
+export function renderTimelineItem(item: NonStep): ReactNode {
   switch (item.kind) {
     case 'tool':
       return <ToolCard key={item.id} item={item} />
@@ -21,6 +24,104 @@ export function renderTimelineItem(item: Exclude<TimelineItem, { kind: 'step' }>
     case 'notice':
       return <NoticeLine key={item.id} item={item} />
   }
+}
+
+// ── Delegation grouping (orchestration / multi-agent) ────────────────────────
+// The backend brackets a sub-agent's work with a `delegate` tool + "🤝 …delege
+// edildi" / "✅ … tamamladı" notices (no new event types). We fold those markers
+// into an indented DelegationBlock so the sub-agent's steps read as its own.
+
+// Plain booleans (not type predicates) so their false-branches don't wrongly
+// narrow away other notice/tool kinds. Access fields via the typed helpers below.
+const noticeText = (t: NonStep) => (t.kind === 'notice' ? t.text : '')
+const isDelegateTool = (t: NonStep) => t.kind === 'tool' && (t as ToolItem).name === 'delegate'
+const isStartNotice = (t: NonStep) => t.kind === 'notice' && t.text.includes('🤝') && /delege/i.test(t.text)
+const isEndNotice = (t: NonStep) => t.kind === 'notice' && t.text.includes('✅') && /tamamlad/i.test(t.text)
+
+const delegAgent = (t: NonStep) => String((t as ToolItem).args?.agent ?? '')
+const delegTask = (t: NonStep) => {
+  const task = (t as ToolItem).args?.task
+  return task ? String(task) : undefined
+}
+
+function parseStartNotice(text: string): { agent: string; task?: string } {
+  const m = text.match(/🤝\s*(\S+?)['’]?[ae]\s+delege edildi:?\s*(.*)/i)
+  if (m) return { agent: m[1], task: m[2]?.trim() || undefined }
+  return { agent: '' }
+}
+
+interface DelegNode {
+  t: 'deleg'
+  id: string
+  agent: string
+  task?: string
+  items: NonStep[]
+  running: boolean
+  _end: boolean
+  _deleg: ToolItem | null
+}
+type ChildNode = { t: 'item'; item: NonStep } | DelegNode
+
+function groupDelegations(items: NonStep[]): ChildNode[] {
+  const out: ChildNode[] = []
+  let cur: DelegNode | null = null
+  for (const item of items) {
+    if (!cur && (isStartNotice(item) || isDelegateTool(item))) {
+      cur = { t: 'deleg', id: item.id, agent: '', task: undefined, items: [], running: true, _end: false, _deleg: null }
+      if (isDelegateTool(item)) {
+        cur.agent = delegAgent(item)
+        cur.task = delegTask(item)
+        cur._deleg = item as ToolItem
+      } else {
+        const p = parseStartNotice(noticeText(item))
+        cur.agent = p.agent
+        cur.task = p.task
+      }
+      out.push(cur)
+      continue
+    }
+    if (cur) {
+      if (isEndNotice(item)) {
+        cur._end = true
+        cur = null
+        continue
+      }
+      if (isDelegateTool(item)) {
+        if (!cur.agent) cur.agent = delegAgent(item)
+        if (!cur.task) cur.task = delegTask(item)
+        cur._deleg = item as ToolItem
+        continue
+      }
+      if (isStartNotice(item)) {
+        if (!cur.agent) {
+          const p = parseStartNotice(noticeText(item))
+          cur.agent = p.agent
+          cur.task = cur.task ?? p.task
+        }
+        continue
+      }
+      cur.items.push(item)
+    } else {
+      out.push({ t: 'item', item })
+    }
+  }
+  for (const n of out) {
+    if (n.t === 'deleg') n.running = n._end ? false : n._deleg ? n._deleg.status !== 'done' : true
+  }
+  return out
+}
+
+/** Render a step's children with sub-agent delegations folded into blocks. */
+export function renderChildren(items: NonStep[]): ReactNode[] {
+  return groupDelegations(items).map((n) =>
+    n.t === 'item' ? (
+      renderTimelineItem(n.item)
+    ) : (
+      <DelegationBlock key={n.id} agent={n.agent} task={n.task} running={n.running}>
+        {n.items.map(renderTimelineItem)}
+      </DelegationBlock>
+    ),
+  )
 }
 
 interface StepGroupProps {
@@ -102,7 +203,7 @@ export function StepGroup({ index, step, items, active }: StepGroupProps) {
               </p>
             </div>
           )}
-          {items.map(renderTimelineItem)}
+          {renderChildren(items)}
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Loader2, Paperclip, SendHorizontal, Telescope } from 'lucide-react'
+import { Loader2, Paperclip, SendHorizontal, Telescope, Users } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { uploadFile } from '@/lib/api'
@@ -17,6 +17,8 @@ export function Composer() {
   const sessionId = useStore((s) => s.sessionId)
   const deepSearch = useStore((s) => s.deepSearch)
   const setDeepSearch = useStore((s) => s.setDeepSearch)
+  const orchestrate = useStore((s) => s.orchestrate)
+  const setOrchestrate = useStore((s) => s.setOrchestrate)
   const submitPrompt = useStore((s) => s.submitPrompt)
 
   const grow = () => {
@@ -104,6 +106,26 @@ export function Composer() {
           >
             <Telescope size={15} />
             DeepSearch
+          </button>
+          <button
+            type="button"
+            onClick={() => setOrchestrate(!orchestrate)}
+            title="Çok-ajan orkestrasyon — manager işi alt-ajanlara böler · 30B+ için önerilir"
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12.5px] font-medium transition-colors',
+              orchestrate ? 'border-accent/50 bg-accent-soft text-accent' : 'border-border text-muted hover:text-text',
+            )}
+          >
+            <Users size={15} />
+            Orkestrasyon
+            <span
+              className={cn(
+                'rounded px-1 text-[10px] font-semibold',
+                orchestrate ? 'bg-accent/15 text-accent' : 'bg-panel text-muted/70',
+              )}
+            >
+              30B+
+            </span>
           </button>
           <div className="flex-1" />
           <Button size="icon" onClick={submit} disabled={!text.trim() || busy || !connected} aria-label="Gönder">

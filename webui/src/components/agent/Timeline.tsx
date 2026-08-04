@@ -1,5 +1,5 @@
 import type { TimelineItem } from '@/lib/types'
-import { StepGroup, renderTimelineItem } from './StepGroup'
+import { StepGroup, renderChildren } from './StepGroup'
 
 type StepItem = Extract<TimelineItem, { kind: 'step' }>
 type NonStep = Exclude<TimelineItem, { kind: 'step' }>
@@ -34,7 +34,7 @@ export function Timeline({ items, turnDone }: { items: TimelineItem[]; turnDone:
         const isLast = i === groups.length - 1
         const active = g.step?.streaming || (isLast && !turnDone)
         // A group with no thought (e.g. a stray notice) renders flat, no chrome.
-        if (!g.step) return g.items.map(renderTimelineItem)
+        if (!g.step) return <div key={`flat-${i}`} className="space-y-2">{renderChildren(g.items)}</div>
         stepNo += 1
         return <StepGroup key={g.step.id} index={stepNo} step={g.step} items={g.items} active={!!active} />
       })}

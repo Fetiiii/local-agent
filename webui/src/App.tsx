@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Menu, PanelLeft, PanelRight, Plus, Settings2 } from 'lucide-react'
+import { Loader2, Menu, PanelLeft, PanelRight, Plus, Settings2 } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { Brand } from '@/components/layout/Brand'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
@@ -54,18 +54,26 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 function ModelSelect() {
   const models = useStore((s) => s.models)
   const model = useStore((s) => s.model)
-  const setModel = useStore((s) => s.setModel)
+  const switchModel = useStore((s) => s.switchModel)
   const busy = useStore((s) => s.busy)
+  const modelSwitching = useStore((s) => s.modelSwitching)
   if (!models.length) return null
   return (
-    <Select
-      value={model ?? undefined}
-      onValueChange={setModel}
-      options={models}
-      placeholder="Model"
-      disabled={busy}
-      labelOf={shortModelName}
-    />
+    <div className="flex items-center gap-1.5">
+      <Select
+        value={model ?? undefined}
+        onValueChange={switchModel}
+        options={models}
+        placeholder="Model"
+        disabled={busy || modelSwitching}
+        labelOf={shortModelName}
+      />
+      {modelSwitching && (
+        <span className="flex items-center gap-1 text-[11px] text-muted">
+          <Loader2 size={13} className="spin" /> yükleniyor…
+        </span>
+      )}
+    </div>
   )
 }
 

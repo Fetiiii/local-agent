@@ -10,7 +10,7 @@ export function useAppData() {
     const reload = () => fetchConversations().then(setConversations).catch(() => {})
 
     fetchModels()
-      .then((r) => setModels(r.provider, r.models))
+      .then((r) => setModels(r.provider, r.models, r.current))
       .catch(() => {})
     // Show the server's real generation defaults unless the user has their own.
     if (!hasUserSettings()) fetchSettings().then(initSettings).catch(() => {})

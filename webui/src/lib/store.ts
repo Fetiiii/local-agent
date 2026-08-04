@@ -10,6 +10,7 @@ import type {
   ServerEvent,
   TimelineItem,
 } from './types'
+import { fetchModels, switchModel as apiSwitchModel } from './api'
 
 const DEFAULT_SETTINGS: LlmSettings = { temperature: 0.7, top_p: 1, max_tokens: 0, max_steps: 5 }
 const SETTINGS_KEY = 'la-settings'
@@ -87,6 +88,8 @@ interface AppState {
   provider: string
   model: string | null
   deepSearch: boolean
+  orchestrate: boolean
+  modelSwitching: boolean
   conversations: ConversationMeta[]
   settings: LlmSettings
 
@@ -102,8 +105,10 @@ interface AppState {
   newChat: () => void
   resumeChat: (id: string) => void
   setModel: (m: string) => void
-  setModels: (provider: string, models: string[]) => void
+  setModels: (provider: string, models: string[], current?: string) => void
+  switchModel: (m: string) => void
   setDeepSearch: (v: boolean) => void
+  setOrchestrate: (v: boolean) => void
   setConversations: (list: ConversationMeta[]) => void
   openArtifact: (id: string) => void
   closeArtifacts: () => void
@@ -128,6 +133,8 @@ export const useStore = create<AppState>()(
     provider: '',
     model: null,
     deepSearch: false,
+    orchestrate: false,
+    modelSwitching: false,
     conversations: [],
     settings: loadSettings(),
     send: () => {},
@@ -135,13 +142,45 @@ export const useStore = create<AppState>()(
     setConnected: (v) => set((s) => void (s.connected = v)),
     setSend: (fn) => set((s) => void (s.send = fn)),
     setModel: (m) => set((s) => void (s.model = m)),
-    setModels: (provider, models) =>
+    setModels: (provider, models, current) =>
       set((s) => {
         s.provider = provider
         s.models = models
-        if (!s.model && models.length) s.model = models[0]
+        if (current && models.includes(current)) s.model = current
+        else if (!s.model || !models.includes(s.model)) s.model = models[0] ?? null
       }),
+    switchModel: (m) => {
+      if (get().modelSwitching || get().busy || m === get().model) return
+      set((s) => void (s.modelSwitching = true))
+      apiSwitchModel(m)
+        .then((res) => {
+          if (res.ok) {
+            set((s) => void (s.model = res.model ?? m))
+          } else {
+            set((s) => {
+              const msg = emptyAssistant()
+              msg.pending = false
+              msg.done = true
+              msg.timeline.push({
+                kind: 'notice',
+                id: uid(),
+                text: `Model değiştirilemedi: ${res.error ?? 'bilinmeyen hata'}`,
+                level: 'error',
+              })
+              s.messages.push(msg)
+            })
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          set((s) => void (s.modelSwitching = false))
+          fetchModels()
+            .then((r) => get().setModels(r.provider, r.models, r.current))
+            .catch(() => {})
+        })
+    },
     setDeepSearch: (v) => set((s) => void (s.deepSearch = v)),
+    setOrchestrate: (v) => set((s) => void (s.orchestrate = v)),
     setConversations: (list) => set((s) => void (s.conversations = list)),
     openArtifact: (id) =>
       set((s) => {
@@ -168,6 +207,26 @@ export const useStore = create<AppState>()(
           case 'session':
             s.sessionId = ev.id
             s.threadId = ev.thread_id
+            // A 'session' arriving while busy means the socket dropped mid-turn and
+            // auto-reconnected; the turn's 'done' went to the dead socket, so the
+            // input would stay locked forever. Release it and close the dangling
+            // assistant turn with a notice.
+            if (s.busy) {
+              const a = s.messages.find((m) => m.id === s.currentAssistantId)
+              if (a) {
+                a.pending = false
+                a.streaming = false
+                a.done = true
+                a.timeline.push({
+                  kind: 'notice',
+                  id: uid(),
+                  text: 'Bağlantı koptu ve yeniden kuruldu — yanıt yarıda kalmış olabilir, tekrar deneyebilirsin.',
+                  level: 'warn',
+                })
+              }
+              s.currentAssistantId = null
+              s.busy = false
+            }
             break
 
           case 'thread':
@@ -393,7 +452,7 @@ export const useStore = create<AppState>()(
 
     submitPrompt: (text) => {
       const t = text.trim()
-      if (!t || get().busy || !get().connected) return
+      if (!t || get().busy || !get().connected || get().modelSwitching) return
       const assistant = emptyAssistant()
       set((s) => {
         s.messages.push({
@@ -410,12 +469,13 @@ export const useStore = create<AppState>()(
         s.currentAssistantId = assistant.id
         s.busy = true
       })
-      const { model, deepSearch } = get()
+      const { model, deepSearch, orchestrate } = get()
       get().send({
         type: 'user_message',
         content: t,
         model: model ?? undefined,
         deep_research: deepSearch,
+        orchestrate,
       })
     },
 

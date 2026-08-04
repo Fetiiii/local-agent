@@ -10,6 +10,17 @@ export async function fetchSettings(): Promise<LlmSettings> {
   return r.json()
 }
 
+export async function switchModel(
+  model: string,
+): Promise<{ ok: boolean; model?: string; error?: string; note?: string }> {
+  const r = await fetch('/api/model/switch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model }),
+  })
+  return r.json()
+}
+
 export async function fetchConversations(): Promise<ConversationMeta[]> {
   const r = await fetch('/api/conversations')
   return r.json()

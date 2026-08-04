@@ -9,6 +9,7 @@ import {
   Microscope,
   Search,
   Terminal,
+  Users,
   Wrench,
   type LucideIcon,
 } from 'lucide-react'
@@ -29,8 +30,20 @@ const MAP: Record<string, ToolMeta> = {
   file_architect: { label: 'Dosya oluşturma', Icon: FilePlus2 },
   file_surgeon: { label: 'Dosya düzenleme', Icon: FileEdit },
   final_answer: { label: 'Cevaptan', Icon: Code2 },
+  delegate: { label: 'Delegasyon', Icon: Users },
 }
 
 export function toolMeta(name: string): ToolMeta {
   return MAP[name] ?? { label: name, Icon: Wrench }
+}
+
+/** Friendly Turkish label for a sub-agent id (coderAgent → "Kodlayıcı"). */
+export function agentLabel(name: string): string {
+  const n = (name || '').toLowerCase()
+  if (n.includes('coder') || n.includes('code')) return 'Kodlayıcı'
+  if (n.includes('research')) return 'Araştırmacı'
+  if (n.includes('planner') || n.includes('plan')) return 'Planlayıcı'
+  if (n.includes('writer') || n.includes('write')) return 'Yazar'
+  if (n.includes('analyst') || n.includes('data')) return 'Analist'
+  return name || 'Alt-ajan'
 }

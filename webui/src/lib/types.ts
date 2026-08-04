@@ -50,7 +50,7 @@ export type ServerEvent =
 
 // ── Client → server messages ────────────────────────────────────────────────
 export type ClientMessage =
-  | { type: 'user_message'; content: string; model?: string; deep_research?: boolean }
+  | { type: 'user_message'; content: string; model?: string; deep_research?: boolean; orchestrate?: boolean }
   | { type: 'approval_response'; id: string; approved: boolean }
   | { type: 'resume'; id: string }
   | { type: 'new' }
@@ -68,6 +68,8 @@ export interface LlmSettings {
 export interface ModelsResponse {
   provider: string
   models: string[]
+  current?: string       // currently-loaded model (llama.cpp)
+  manageable?: boolean   // server can hot-swap models (llama.cpp managed)
   error?: string
 }
 
