@@ -29,9 +29,10 @@ from backend.tools import ToolRegistry
 AGENT_SCHEMA = AgentAction.model_json_schema()
 MAX_TOOL_CALLS = 8
 MAX_OBS_CHARS = 8000
-# Cap a single generation so a degenerate loop can't run away (seen: a 12.7k-token
-# decision burning ~5 min). Generous enough for large multi-file writes.
-DECISION_MAX_TOKENS = 8192
+# Cap a single generation so a degenerate loop can't fill the whole context, WITHOUT
+# truncating a legitimate large multi-file write (a 7-file scaffold ≈ 8-12k tokens; a
+# lower cap corrupts it). 16k fits real writes yet bounds a runaway (128k → 16k).
+DECISION_MAX_TOKENS = 16384
 
 _COMPOSE_INSTRUCTION = (
     "Based on everything above, write your final answer to the user now. "
