@@ -257,15 +257,20 @@ async def _decide(model: ModelClient, messages: List[Dict], ui: AgentUI):
 
 def _shell_hint() -> str:
     """A mode-accurate note about shell_executor's working directory, so the
-    model doesn't guess (e.g. '/workspace') and waste a step on a refused path."""
+    model doesn't guess (e.g. '/workspace') and waste steps on wrong paths."""
+    run = ("\n\nRUNNING PROJECT CODE: to run a multi-file PACKAGE, set 'cwd' to the package's "
+           "PARENT folder and use `python -m pkg.module <args>` (args are paths relative to that "
+           "parent, e.g. `pkg/data.txt`) — do NOT do `python pkg/module.py`. For a single script, "
+           "set 'cwd' to its folder and run `python script.py`. Keep 'cwd' the SAME across the "
+           "related build/test/run commands so relative paths line up.")
     if settings.shell_host:
         return ("\n\nSHELL NOTE: shell_executor runs on the HOST with full access "
-                "(each command is user-approved). 'cwd' may be any path; it defaults to your home. "
-                "Files created by file_architect/data_analyst live under data/exports — to run one "
-                "with shell, cd into it or give its full path.")
+                "(each command is user-approved). Files you create live under data/exports, so set "
+                "'cwd' to 'data/exports' (or a sub-folder) to reach them; it otherwise defaults to "
+                "your home." + run)
     return ("\n\nSHELL NOTE: shell_executor runs in a RESTRICTED working area (data/exports). "
             "Pass 'cwd' as a relative sub-folder name or omit it — NEVER an absolute path "
-            "like /workspace, or the command is refused.")
+            "like /workspace, or the command is refused." + run)
 
 
 def _workspace_hint() -> str:
@@ -278,6 +283,24 @@ def _workspace_hint() -> str:
             "(e.g. 'report.py', 'out/data.csv') — NEVER prefix with 'data/exports/'. A file you "
             "create as 'app.py' is opened in data_analyst as open('app.py'), not "
             "open('data/exports/app.py').")
+
+
+def _clean_final(text: str) -> str:
+    """Guard against a raw decision JSON leaking as the final answer (some models
+    emit a `{"thought":…}` object where prose was asked, e.g. when the loop ends
+    messily). Salvage the useful field instead of showing JSON to the user."""
+    t = (text or "").strip()
+    looks_json = t.startswith("{") and any(
+        k in t for k in ('"thought"', '"tool_calls"', '"plan"', '"final_answer"'))
+    if not looks_json:
+        return t
+    data = extract_json(t)
+    if data:
+        for k in ("final_answer", "thought"):
+            v = str(data.get(k) or "").strip()
+            if v and not v.startswith("{"):
+                return v
+    return "✅ İşlem tamamlandı."
 
 
 async def run_agent(query: str, ctx: AgentContext):
@@ -345,6 +368,7 @@ async def run_agent(query: str, ctx: AgentContext):
                 await _stream_text(ctx.ui, answer)
         else:
             answer = await _compose(ctx.model, messages, ctx.ui)
+        answer = _clean_final(answer)
         await ctx.ui.final(answer)
         ctx.history.append({"role": "user", "content": query})
         ctx.history.append({"role": "assistant", "content": answer})
