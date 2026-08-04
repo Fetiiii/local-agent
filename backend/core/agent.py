@@ -260,10 +260,24 @@ def _shell_hint() -> str:
     model doesn't guess (e.g. '/workspace') and waste a step on a refused path."""
     if settings.shell_host:
         return ("\n\nSHELL NOTE: shell_executor runs on the HOST with full access "
-                "(each command is user-approved). 'cwd' may be any path; it defaults to your home.")
+                "(each command is user-approved). 'cwd' may be any path; it defaults to your home. "
+                "Files created by file_architect/data_analyst live under data/exports — to run one "
+                "with shell, cd into it or give its full path.")
     return ("\n\nSHELL NOTE: shell_executor runs in a RESTRICTED working area (data/exports). "
             "Pass 'cwd' as a relative sub-folder name or omit it — NEVER an absolute path "
             "like /workspace, or the command is refused.")
+
+
+def _workspace_hint() -> str:
+    """The file tools and data_analyst share ONE folder (data/exports). Models
+    otherwise prefix paths with 'data/exports/' and hit FileNotFoundError inside
+    data_analyst (whose CWD already IS that folder) → retry loops. Anchor the
+    convention: always use a plain relative name."""
+    return ("\n\nWORKSPACE NOTE: file_architect, file_surgeon, file_reader_v2 and data_analyst all "
+            "operate in ONE shared folder. ALWAYS refer to files by a PLAIN relative name "
+            "(e.g. 'report.py', 'out/data.csv') — NEVER prefix with 'data/exports/'. A file you "
+            "create as 'app.py' is opened in data_analyst as open('app.py'), not "
+            "open('data/exports/app.py').")
 
 
 async def run_agent(query: str, ctx: AgentContext):
@@ -272,6 +286,8 @@ async def run_agent(query: str, ctx: AgentContext):
         base_prompt += ORCHESTRATION_ADDENDUM
     if ctx.registry.get("shell_executor"):
         base_prompt += _shell_hint()
+    if ctx.registry.get("data_analyst") or ctx.registry.get("file_architect"):
+        base_prompt += _workspace_hint()
     system_content = mem.system_prompt_with_memory(base_prompt, ctx.state.get("summary", ""))
     messages = [{"role": "system", "content": system_content}]
     messages.extend(ctx.history[-mem.MAX_RECENT:])

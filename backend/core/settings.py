@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     # Agent Parameters
     retry_count: int = Field(3, env="RETRY_COUNT")
-    max_steps: int = Field(5, env="MAX_STEPS")
+    max_steps: int = Field(10, env="MAX_STEPS")
 
     # Ingestion: OCR is slow and only needed for scanned PDFs — off by default.
     ingest_ocr: bool = Field(False, env="INGEST_OCR")
