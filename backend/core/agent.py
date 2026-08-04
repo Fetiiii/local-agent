@@ -256,21 +256,22 @@ async def _decide(model: ModelClient, messages: List[Dict], ui: AgentUI):
 # ── Main loop ────────────────────────────────────────────────────────────────
 
 def _shell_hint() -> str:
-    """A mode-accurate note about shell_executor's working directory, so the
-    model doesn't guess (e.g. '/workspace') and waste steps on wrong paths."""
-    run = ("\n\nRUNNING PROJECT CODE: to run a multi-file PACKAGE, set 'cwd' to the package's "
-           "PARENT folder and use `python -m pkg.module <args>` (args are paths relative to that "
-           "parent, e.g. `pkg/data.txt`) — do NOT do `python pkg/module.py`. For a single script, "
-           "set 'cwd' to its folder and run `python script.py`. Keep 'cwd' the SAME across the "
-           "related build/test/run commands so relative paths line up.")
+    """Tell the model exactly where shell_executor runs, so it stops guessing
+    working directories and wasting steps on wrong paths."""
+    run = ("\n\nRUNNING PROJECT CODE: your files live in the shell's default working folder, and a "
+           "package you create (e.g. 'myproj/…') sits directly in it. To run it use "
+           "`python -m myproj.cli <args>` from that folder — do NOT `cd` first, do NOT do "
+           "`python myproj/cli.py`, and do NOT prefix the folder onto arguments. For a lone script, "
+           "pass its sub-folder as 'cwd' and run `python script.py`.")
     if settings.shell_host:
-        return ("\n\nSHELL NOTE: shell_executor runs on the HOST with full access "
-                "(each command is user-approved). Files you create live under data/exports, so set "
-                "'cwd' to 'data/exports' (or a sub-folder) to reach them; it otherwise defaults to "
-                "your home." + run)
-    return ("\n\nSHELL NOTE: shell_executor runs in a RESTRICTED working area (data/exports). "
-            "Pass 'cwd' as a relative sub-folder name or omit it — NEVER an absolute path "
-            "like /workspace, or the command is refused." + run)
+        return ("\n\nSHELL NOTE: shell_executor runs on the HOST (each command is user-approved) and "
+                "STARTS IN data/exports — the folder where file_architect/data_analyst put your "
+                "files. Run commands directly; pass 'cwd' as a plain sub-folder name to go deeper "
+                "(e.g. 'myproj'), NOT 'data/exports/myproj'. Use an ABSOLUTE 'cwd' path only for "
+                "tasks elsewhere on the machine." + run)
+    return ("\n\nSHELL NOTE: shell_executor runs in a RESTRICTED working area (data/exports) — where "
+            "your files already are. Pass 'cwd' as a plain sub-folder name or omit it; NEVER an "
+            "absolute path like /workspace, or the command is refused." + run)
 
 
 def _workspace_hint() -> str:

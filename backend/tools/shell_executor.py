@@ -73,14 +73,22 @@ class ShellExecutorTool:
         }
 
     async def _run_host(self, command: str, cwd: str, timeout: int) -> str:
-        """Run on the host with full access and an unrestricted working directory."""
+        """Run on the host with full access. The working directory DEFAULTS to the
+        agent's shared area (data/exports) so it lines up with file_architect and
+        data_analyst; a relative 'cwd' resolves under it. An ABSOLUTE 'cwd' (or a
+        ~-path) is honored as-is, so full-machine access is preserved."""
         from pathlib import Path as _P
+        EXPORTS_ROOT.mkdir(parents=True, exist_ok=True)
         try:
-            resolved_cwd = _P(cwd).expanduser() if cwd else _P.home()
+            if cwd:
+                p = _P(cwd).expanduser()
+                resolved_cwd = p if p.is_absolute() else (EXPORTS_ROOT / cwd)
+            else:
+                resolved_cwd = EXPORTS_ROOT
             if not resolved_cwd.is_dir():
-                resolved_cwd = _P.home()
+                resolved_cwd = EXPORTS_ROOT
         except Exception:
-            resolved_cwd = _P.home()
+            resolved_cwd = EXPORTS_ROOT
         try:
             process = await asyncio.create_subprocess_shell(
                 command,
