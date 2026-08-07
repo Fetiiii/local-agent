@@ -9,6 +9,7 @@ Run:  python tests/test_agent_core.py
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 import tempfile
 from pathlib import Path
@@ -192,15 +193,31 @@ async def test_run_agent_runaway_tools():
     check("30 duplicate calls deduped to 1 execution", len(tool_starts) == 1)
 
 
+def test_answer_is_complete():
+    print("\n── _answer_is_complete (heuristic) ──")
+    from backend.core.agent import _answer_is_complete
+    BIG, SMALL = 5000, 500
+    long_ok = "Bu tam ve düzgün bir sentez cevabıdır. " * 40  # >800 ch, ends with '.'
+    check("empty → incomplete", not _answer_is_complete("", BIG))
+    check("big-obs long prose ending in '.' → complete", _answer_is_complete(long_ok, BIG))
+    check("big-obs cut mid-sentence → incomplete", not _answer_is_complete("cevap ortada kesildi ve", BIG))
+    check("big-obs ending in ':' → incomplete (enumeration cut)", not _answer_is_complete("İşte üç neden:", BIG))
+    check("big-obs short stub (ends '.') → incomplete", not _answer_is_complete("Kısa cevap.", BIG))
+    # Light-tool (small obs) answers are trusted as-is, even when terse/non-prose.
+    check("small-obs terse 'Sonuç: 42' → complete", _answer_is_complete("Sonuç: 42", SMALL))
+    check("small-obs value ending in digit → complete", _answer_is_complete("Ortalama = 42.5 → 3", SMALL))
+    check("small-obs empty still incomplete", not _answer_is_complete("", SMALL))
+
+
 async def test_run_agent_recompose_on_truncated_after_tools():
-    print("\n── run_agent: truncated final after tools → answer_reset + compose ──")
+    print("\n── run_agent: truncated final after LARGE obs → answer_reset + compose ──")
     model = FakeModel([
         '{"tool_calls": [{"name": "deep_research", "args": {"query": "x"}}]}',
         # grammar final_answer cut mid-sentence (no terminal punctuation)
         '{"final_answer": "Bu cevap ortada kesiliyor ve düzgün bitmiyor bu yüzden"}',
         'Tam ve düzgün derlenmiş nihai cevap burada, noktayla biter.',   # _compose output
     ])
-    ctx = _ctx(model, tools=[FakeTool("deep_research", "x" * 3000)])
+    ctx = _ctx(model, tools=[FakeTool("deep_research", "x" * 5000)])  # large synthesis obs
     await run_agent("q", ctx)
     kinds = ctx.ui.kinds()
     final = [e for e in ctx.ui.events if e[0] == "final"][-1][1]
@@ -209,19 +226,33 @@ async def test_run_agent_recompose_on_truncated_after_tools():
     check("truncated grammar answer discarded", "ortada kesiliyor" not in final)
 
 
-async def test_run_agent_complete_after_tools_no_recompose():
-    print("\n── run_agent: complete final after tools → used directly ──")
+async def test_run_agent_complete_after_big_obs_no_recompose():
+    print("\n── run_agent: complete prose after LARGE obs → used directly ──")
+    long_complete = "Bu, deep_research bulgularının tam bir sentezidir. " * 30  # >800, ends '.'
     model = FakeModel([
-        '{"tool_calls": [{"name": "web_search", "args": {"query": "x"}}]}',
-        '{"final_answer": "Cevap tamamdır ve düzgün biter."}',
-        # NOTE: no 3rd script entry — a wrongful recompose would fall back to the
-        # FakeModel default and change the answer, failing the check below.
+        '{"tool_calls": [{"name": "deep_research", "args": {"query": "x"}}]}',
+        json.dumps({"final_answer": long_complete}, ensure_ascii=False),
+        # no 3rd entry — a wrongful recompose would change the answer
     ])
-    ctx = _ctx(model, tools=[FakeTool("web_search", "kısa sonuç")])
+    ctx = _ctx(model, tools=[FakeTool("deep_research", "x" * 5000)])
     await run_agent("q", ctx)
-    check("no answer_reset (answer was complete)", "answer_reset" not in ctx.ui.kinds())
+    check("no answer_reset (prose answer was complete)", "answer_reset" not in ctx.ui.kinds())
     final = [e for e in ctx.ui.events if e[0] == "final"][-1][1]
-    check("complete answer used directly", "Cevap tamamdır" in final)
+    check("complete answer used directly", "tam bir sentezidir" in final)
+
+
+async def test_run_agent_terse_answer_light_tool_no_recompose():
+    print("\n── run_agent: terse non-prose answer after LIGHT tool → not recomposed ──")
+    model = FakeModel([
+        '{"tool_calls": [{"name": "data_analyst", "args": {"code": "print(6*7)"}}]}',
+        '{"final_answer": "Sonuç: 42"}',   # terse, ends in a digit — legitimately complete
+        # no 3rd entry — a wrongful recompose (advisor\'s regression) would rewrite this
+    ])
+    ctx = _ctx(model, tools=[FakeTool("data_analyst", "42")])  # small obs
+    await run_agent("q", ctx)
+    check("no answer_reset (light-tool terse answer trusted)", "answer_reset" not in ctx.ui.kinds())
+    final = [e for e in ctx.ui.events if e[0] == "final"][-1][1]
+    check("terse answer used verbatim", "Sonuç: 42" in final)
 
 
 # ── conversations ────────────────────────────────────────────────────────────
@@ -286,8 +317,10 @@ async def main():
     await test_run_agent_tool_then_final()
     await test_run_agent_direct_final()
     await test_run_agent_runaway_tools()
+    test_answer_is_complete()
     await test_run_agent_recompose_on_truncated_after_tools()
-    await test_run_agent_complete_after_tools_no_recompose()
+    await test_run_agent_complete_after_big_obs_no_recompose()
+    await test_run_agent_terse_answer_light_tool_no_recompose()
     test_conversations()
     test_memory_prompt()
     await test_memory_summarize()

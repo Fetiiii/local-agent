@@ -360,23 +360,32 @@ def _clean_final(text: str) -> str:
     return "✅ İşlem tamamlandı."
 
 
-_SENTENCE_END = (".", "!", "?", "…", ")", "]", '"', "”", ":", "*", "`")
+# Terminal marks a finished prose reply may end on. Deliberately EXCLUDES ':'
+# and '*' — both are common mid-truncation points ("İşte nedenleri:", a dangling
+# bold "**") that would otherwise be misjudged as complete.
+_SENTENCE_END = (".", "!", "?", "…", ")", "]", '"', "”", "`")
+
+# deep_research-scale synthesis. The grammar-JSON instability is specific to a
+# LARGE observation in context; below this, tool answers are terse by design.
+_LARGE_OBS = 3000
 
 
 def _answer_is_complete(answer: str, obs_chars: int) -> bool:
     """Heuristic: does the model's grammar-JSON final_answer look like a finished
-    reply? Grammar-constrained decoding on a reasoning model is unstable right
-    after a large tool observation (~50% truncate on our 35B): the answer either
-    stops mid-sentence (no terminal punctuation) or collapses to a short stub.
-    Measured on N=8: this caught 4/4 bad answers with 0 false negatives."""
+    reply that we can trust as-is? Grammar-constrained decoding on a reasoning
+    model is unstable right after a LARGE tool observation (~50% truncate on our
+    35B): the answer stops mid-sentence or collapses to a short stub. This only
+    applies to that large-synthesis case — light-tool answers (small obs) are
+    legitimately terse and often non-prose (e.g. 'Sonuç: 42'), so we trust them
+    and never recompose. Measured on N=8 (deep_research): 4/4 bad caught, 0 miss."""
     if not answer:
         return False
+    if obs_chars < _LARGE_OBS:
+        return True                 # light-tool terse/non-prose answer → trust it
     if answer.rstrip()[-1:] not in _SENTENCE_END:
-        return False  # cut mid-sentence
-    # After a large synthesis observation (e.g. deep_research), a very short
-    # answer is a stub. Light-tool answers (small obs) may legitimately be short.
-    if obs_chars > 2500 and len(answer) < 800:
-        return False
+        return False                # cut mid-sentence
+    if len(answer) < 800:
+        return False                # short stub after a big synthesis
     return True
 
 
@@ -406,7 +415,7 @@ async def run_agent(query: str, ctx: AgentContext):
     messages.append({"role": "user", "content": user_content})
 
     used_tools = False        # did any tool run this turn? (gates the compose fallback)
-    last_obs_chars = 0        # size of the most recent observation feeding the final decision
+    max_obs_chars = 0         # largest observation seen this turn (a big synthesis stays "in scope")
     for _ in range(ctx.max_steps or config.MAX_STEPS):
         decision, streamer = await _decide(ctx.model, messages, ctx.ui)
         if not decision:
@@ -436,7 +445,7 @@ async def run_agent(query: str, ctx: AgentContext):
         if tool_calls:
             obs = await _run_tools(tool_calls, ctx)
             used_tools = True
-            last_obs_chars = len(obs)
+            max_obs_chars = max(max_obs_chars, len(obs))
             messages.append({"role": "assistant", "content": json.dumps(decision, ensure_ascii=False)})
             messages.append({"role": "user", "content": f"OBSERVATION (Tool Results):\n{obs}"})
             continue
@@ -447,7 +456,7 @@ async def run_agent(query: str, ctx: AgentContext):
         # After tools ran, the grammar-JSON final_answer is unreliable (see
         # _answer_is_complete). Fall back to plain-text _compose, which is stable
         # (8/8 vs grammar's 4/8 in testing). Pure-chat answers stay single-call.
-        if used_tools and not _answer_is_complete(answer, last_obs_chars):
+        if used_tools and not _answer_is_complete(answer, max_obs_chars):
             if streamed_live:
                 await ctx.ui.answer_reset()   # drop the truncated answer from the bubble
             answer = await _compose(ctx.model, messages, ctx.ui)
