@@ -41,6 +41,7 @@ class CaptureUI(AgentUI):
         self.events = []
 
     async def step(self, thought, plan): self.events.append(("step", thought, plan))
+    async def answer_reset(self): self.events.append(("answer_reset",))
     async def tool_start(self, tid, name, args): self.events.append(("tool_start", name, args))
     async def tool_end(self, tid, name, result, artifacts=None): self.events.append(("tool_end", name, result, artifacts))
     async def token(self, text): self.events.append(("token", text))
@@ -191,6 +192,38 @@ async def test_run_agent_runaway_tools():
     check("30 duplicate calls deduped to 1 execution", len(tool_starts) == 1)
 
 
+async def test_run_agent_recompose_on_truncated_after_tools():
+    print("\n── run_agent: truncated final after tools → answer_reset + compose ──")
+    model = FakeModel([
+        '{"tool_calls": [{"name": "deep_research", "args": {"query": "x"}}]}',
+        # grammar final_answer cut mid-sentence (no terminal punctuation)
+        '{"final_answer": "Bu cevap ortada kesiliyor ve düzgün bitmiyor bu yüzden"}',
+        'Tam ve düzgün derlenmiş nihai cevap burada, noktayla biter.',   # _compose output
+    ])
+    ctx = _ctx(model, tools=[FakeTool("deep_research", "x" * 3000)])
+    await run_agent("q", ctx)
+    kinds = ctx.ui.kinds()
+    final = [e for e in ctx.ui.events if e[0] == "final"][-1][1]
+    check("answer_reset emitted (truncated live answer cleared)", "answer_reset" in kinds)
+    check("final is the composed answer", "Tam ve düzgün" in final)
+    check("truncated grammar answer discarded", "ortada kesiliyor" not in final)
+
+
+async def test_run_agent_complete_after_tools_no_recompose():
+    print("\n── run_agent: complete final after tools → used directly ──")
+    model = FakeModel([
+        '{"tool_calls": [{"name": "web_search", "args": {"query": "x"}}]}',
+        '{"final_answer": "Cevap tamamdır ve düzgün biter."}',
+        # NOTE: no 3rd script entry — a wrongful recompose would fall back to the
+        # FakeModel default and change the answer, failing the check below.
+    ])
+    ctx = _ctx(model, tools=[FakeTool("web_search", "kısa sonuç")])
+    await run_agent("q", ctx)
+    check("no answer_reset (answer was complete)", "answer_reset" not in ctx.ui.kinds())
+    final = [e for e in ctx.ui.events if e[0] == "final"][-1][1]
+    check("complete answer used directly", "Cevap tamamdır" in final)
+
+
 # ── conversations ────────────────────────────────────────────────────────────
 
 def test_conversations():
@@ -253,6 +286,8 @@ async def main():
     await test_run_agent_tool_then_final()
     await test_run_agent_direct_final()
     await test_run_agent_runaway_tools()
+    await test_run_agent_recompose_on_truncated_after_tools()
+    await test_run_agent_complete_after_tools_no_recompose()
     test_conversations()
     test_memory_prompt()
     await test_memory_summarize()

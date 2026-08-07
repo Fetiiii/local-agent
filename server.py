@@ -137,6 +137,9 @@ class WebSocketUI(AgentUI):
     async def plan(self, plan):
         await self._send({"type": "plan", "plan": plan})
 
+    async def answer_reset(self):
+        await self._send({"type": "answer_reset"})
+
     async def tool_start(self, tool_id, name, args):
         await self._send({"type": "tool_start", "id": tool_id, "name": name, "args": args})
 

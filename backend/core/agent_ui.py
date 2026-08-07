@@ -26,6 +26,11 @@ class AgentUI(ABC):
     async def plan(self, plan: List[str]) -> None:
         """Live plan/to-do update as items are produced. Default no-op."""
 
+    async def answer_reset(self) -> None:
+        """Clear a partially-streamed final answer from the current turn's bubble
+        (e.g. a truncated grammar answer we're about to replace via a plain-text
+        re-compose). Default no-op so non-streaming adapters keep working."""
+
     @abstractmethod
     async def tool_start(self, tool_id: str, name: str, args: Dict[str, Any]) -> None:
         """A tool is about to run."""

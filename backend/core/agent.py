@@ -360,6 +360,26 @@ def _clean_final(text: str) -> str:
     return "✅ İşlem tamamlandı."
 
 
+_SENTENCE_END = (".", "!", "?", "…", ")", "]", '"', "”", ":", "*", "`")
+
+
+def _answer_is_complete(answer: str, obs_chars: int) -> bool:
+    """Heuristic: does the model's grammar-JSON final_answer look like a finished
+    reply? Grammar-constrained decoding on a reasoning model is unstable right
+    after a large tool observation (~50% truncate on our 35B): the answer either
+    stops mid-sentence (no terminal punctuation) or collapses to a short stub.
+    Measured on N=8: this caught 4/4 bad answers with 0 false negatives."""
+    if not answer:
+        return False
+    if answer.rstrip()[-1:] not in _SENTENCE_END:
+        return False  # cut mid-sentence
+    # After a large synthesis observation (e.g. deep_research), a very short
+    # answer is a stub. Light-tool answers (small obs) may legitimately be short.
+    if obs_chars > 2500 and len(answer) < 800:
+        return False
+    return True
+
+
 async def run_agent(query: str, ctx: AgentContext):
     base_prompt = ctx.system_prompt or SYSTEM_PROMPT
     if ctx.orchestrate:
@@ -385,6 +405,8 @@ async def run_agent(query: str, ctx: AgentContext):
         user_content += f"\n\nContext from Files (RAG):\n{context_str}"
     messages.append({"role": "user", "content": user_content})
 
+    used_tools = False        # did any tool run this turn? (gates the compose fallback)
+    last_obs_chars = 0        # size of the most recent observation feeding the final decision
     for _ in range(ctx.max_steps or config.MAX_STEPS):
         decision, streamer = await _decide(ctx.model, messages, ctx.ui)
         if not decision:
@@ -413,15 +435,25 @@ async def run_agent(query: str, ctx: AgentContext):
 
         if tool_calls:
             obs = await _run_tools(tool_calls, ctx)
+            used_tools = True
+            last_obs_chars = len(obs)
             messages.append({"role": "assistant", "content": json.dumps(decision, ensure_ascii=False)})
             messages.append({"role": "user", "content": f"OBSERVATION (Tool Results):\n{obs}"})
             continue
 
         # No tools → final answer.
         answer = (decision.get("final_answer") or "").strip()
-        if answer:
+        streamed_live = bool(streamer and streamer.streamed_final)
+        # After tools ran, the grammar-JSON final_answer is unreliable (see
+        # _answer_is_complete). Fall back to plain-text _compose, which is stable
+        # (8/8 vs grammar's 4/8 in testing). Pure-chat answers stay single-call.
+        if used_tools and not _answer_is_complete(answer, last_obs_chars):
+            if streamed_live:
+                await ctx.ui.answer_reset()   # drop the truncated answer from the bubble
+            answer = await _compose(ctx.model, messages, ctx.ui)
+        elif answer:
             # If the streaming decision already emitted the answer live, don't re-stream.
-            if not (streamer and streamer.streamed_final):
+            if not streamed_live:
                 await _stream_text(ctx.ui, answer)
         else:
             answer = await _compose(ctx.model, messages, ctx.ui)

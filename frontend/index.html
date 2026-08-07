@@ -168,6 +168,7 @@ function handle(m){
       scroll(); break;
     }
     case 'token': ensureAssistant().textContent += m.text; scroll(); break;
+    case 'answer_reset': ensureAssistant().textContent = ''; scroll(); break;
     case 'final': ensureAssistant().textContent = m.text; scroll(); break;
     case 'notice':{
       log.appendChild(el('notice '+(m.level||'info'), esc(m.text))); scroll(); break;
