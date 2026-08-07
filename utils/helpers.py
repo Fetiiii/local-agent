@@ -1,9 +1,66 @@
 import json
+import re
 import ollama
 from typing import Optional, Dict, Any, List
 from json_repair import repair_json
 from backend.core.schemas import AgentAction
 from backend.core.settings import settings
+
+_FA_KEY = re.compile(r'"final_answer"\s*:\s*"')
+_ESC = {'n': '\n', 't': '\t', 'r': '\r', '"': '"', '\\': '\\',
+        '/': '/', 'b': '\b', 'f': '\f'}
+
+
+def _decode_lenient(s: str) -> str:
+    """Decode standard JSON string escapes, leaving unknown ones as literal text."""
+    out: List[str] = []
+    i, n = 0, len(s)
+    while i < n:
+        c = s[i]
+        if c == '\\' and i + 1 < n:
+            e = s[i + 1]
+            if e == 'u' and i + 6 <= n:
+                try:
+                    out.append(chr(int(s[i + 2:i + 6], 16)))
+                    i += 6
+                    continue
+                except ValueError:
+                    pass
+            out.append(_ESC.get(e, e))
+            i += 2
+            continue
+        out.append(c)
+        i += 1
+    return ''.join(out)
+
+
+def salvage_final_answer(raw: str) -> Optional[str]:
+    """Recover a free-prose final_answer that contains UNESCAPED inner quotes.
+
+    Small models writing rich markdown (citations, quoted terms) after a deep
+    research step often emit an unescaped `"` mid-answer. When that quote lands
+    right before a `, "word":` or `"}` pattern, json_repair reads it as the end
+    of the value and silently truncates the answer. We rely on the schema
+    convention that final_answer is the LAST field: its value runs to the last
+    `"` that is followed only by `}` / whitespace (or the end of the output)."""
+    if not raw:
+        return None
+    end_brace = raw.rfind('}')
+    scope = raw[:end_brace + 1] if end_brace != -1 else raw
+    m = None
+    for m in _FA_KEY.finditer(scope):
+        pass  # keep the last match (final_answer is the last field)
+    if not m:
+        return None
+    tail = scope[m.end():]
+    idx = tail.rfind('"')
+    while idx != -1:
+        after = re.sub(r'\s', '', tail[idx + 1:])
+        if after == '' or set(after) <= {'}'}:
+            return _decode_lenient(tail[:idx])
+        idx = tail.rfind('"', 0, idx)
+    # No proper closing quote (generation cut off) → take everything as prose.
+    return _decode_lenient(tail)
 
 async def get_ollama_models() -> List[str]:
     """Fetches all locally downloaded models from Ollama."""
@@ -76,6 +133,16 @@ def extract_json(response_str: str, schema_cls: Any = AgentAction) -> Optional[D
             if len(parsed_dict["tool_calls"]) > 8:
                 print(f"⚠️ Truncating runaway tool_calls: {len(parsed_dict['tool_calls'])} → 8")
                 parsed_dict["tool_calls"] = parsed_dict["tool_calls"][:8]
+
+        # Rescue a final_answer that json_repair truncated on an unescaped inner
+        # quote. Only in answering mode (no tool calls), and only when salvage
+        # recovers strictly MORE text — so clean answers keep json_repair's value.
+        if schema_cls == AgentAction and not (parsed_dict.get("tool_calls") or []):
+            salv = salvage_final_answer(response_str)
+            cur = parsed_dict.get("final_answer")
+            if salv and (not isinstance(cur, str) or len(salv) > len(cur)):
+                print(f"⚠️ Salvaged truncated final_answer: {len(cur or '')} → {len(salv)} chars")
+                parsed_dict["final_answer"] = salv
 
         # 3. Validate with Pydantic Schema
         if schema_cls == AgentAction:

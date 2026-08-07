@@ -104,6 +104,35 @@ def test_sanitize():
     check("drops malformed calls", len(out) == 1 and out[0]["name"] == "ok")
 
 
+# ── extract_json: final_answer salvage ───────────────────────────────────────
+
+def test_final_answer_salvage():
+    print("\n── extract_json: final_answer salvage ──")
+    from utils.helpers import extract_json
+
+    # Unescaped inner quote lands before a `, "word":` pattern → json_repair alone
+    # truncates. Salvage must recover the full prose. (Reproduces the DeepResearch
+    # answer-cut-off bug.)
+    raw = ('{"thought":"ok","tool_calls":[],"final_answer":"Model bir "olasilik '
+           'motoru"dur; bir bilginin dogrulugunu", "kaynak": "tahmin eder ve '
+           'aciklama uzun uzun devam ediyordu"}')
+    d = extract_json(raw)
+    fa = (d or {}).get("final_answer") or ""
+    check("recovers full prose past the unescaped quote", "devam ediyordu" in fa)
+    check("recovered answer far longer than the truncation point", len(fa) > 60)
+
+    # Clean answer is left exactly as-is (salvage must not meddle).
+    clean = '{"thought":"x","tool_calls":[],"final_answer":"Merhaba, nasil yardimci olabilirim?"}'
+    d = extract_json(clean)
+    check("clean answer unchanged", (d or {}).get("final_answer") == "Merhaba, nasil yardimci olabilirim?")
+
+    # Tool-call mode: final_answer stays null, salvage must not fire.
+    tool = '{"thought":"ara","tool_calls":[{"name":"web_search","args":{"q":"x"}}],"final_answer":null}'
+    d = extract_json(tool)
+    check("tool mode keeps final_answer null", (d or {}).get("final_answer") in (None, ""))
+    check("tool mode keeps the tool call", len((d or {}).get("tool_calls") or []) == 1)
+
+
 # ── _serialize_artifacts ─────────────────────────────────────────────────────
 
 def test_serialize():
@@ -219,6 +248,7 @@ async def test_memory_summarize():
 async def main():
     print("=" * 60 + "\n  Agent Core — Test Suite\n" + "=" * 60)
     test_sanitize()
+    test_final_answer_salvage()
     test_serialize()
     await test_run_agent_tool_then_final()
     await test_run_agent_direct_final()

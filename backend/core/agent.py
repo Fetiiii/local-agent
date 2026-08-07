@@ -140,6 +140,56 @@ def _extract_string_field(buf: str, key: str):
     return _decode_json_string(buf, k)
 
 
+def _decode_final_answer(buf: str, start: int):
+    """Like _decode_json_string, but tolerant of unescaped inner quotes in the
+    free-prose final_answer (the last field). A `"` closes the value only when
+    the next non-whitespace char is `}`; a trailing `"` at the end of the buffer
+    is held back (ambiguous) until more text arrives. Keeps the live stream from
+    truncating at the first quoted term."""
+    out: List[str] = []
+    i, n = start + 1, len(buf)
+    while i < n:
+        c = buf[i]
+        if c == "\\":
+            if i + 1 >= n:
+                return ("".join(out), False)
+            e = buf[i + 1]
+            if e == "u":
+                if i + 6 > n:
+                    return ("".join(out), False)
+                try:
+                    out.append(chr(int(buf[i + 2:i + 6], 16)))
+                except ValueError:
+                    out.append(buf[i + 2:i + 6])
+                i += 6
+                continue
+            out.append(_ESCAPES.get(e, e))
+            i += 2
+            continue
+        if c == '"':
+            j = i + 1
+            while j < n and buf[j] in " \t\r\n":
+                j += 1
+            if j >= n:
+                return ("".join(out), False)  # ambiguous → wait for more
+            if buf[j] == "}":
+                return ("".join(out), True)   # real closing quote
+            out.append(c)                     # inner quote → part of the prose
+            i += 1
+            continue
+        out.append(c)
+        i += 1
+    return ("".join(out), False)
+
+
+def _extract_final_answer(buf: str):
+    """(value_so_far, closed) for the free-prose final_answer, or (None, False)."""
+    k = _value_start(buf, '"final_answer"')
+    if k < 0 or k >= len(buf) or buf[k] != '"':
+        return (None, False)
+    return _decode_final_answer(buf, k)
+
+
 def _extract_string_array(buf: str, key: str) -> Optional[List[str]]:
     """Fully-closed string items of an array field so far, or None if not started."""
     k = _value_start(buf, key)
@@ -208,7 +258,7 @@ class _DecisionStreamer:
             await self.ui.plan(list(items))
         # final_answer
         if not self._final_done:
-            val, closed = _extract_string_field(self.buf, '"final_answer"')
+            val, closed = _extract_final_answer(self.buf)
             if val is not None:
                 if len(val) > self._final_sent:
                     await self.ui.token(val[self._final_sent:])
